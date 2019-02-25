@@ -1,0 +1,15 @@
+$ENTRY Go {
+  = <Prout 'Введите строки'>
+  <Prout <ReadInput <Card>>>;
+}
+
+ReadInput {
+	0 = ;
+	s.Char e.String = <CheckNumber <Mod <Numb s.Char e.String> 2> (s.Char e.String)> <ReadInput <Card>>; 
+	e.String = <ReadInput <Card>>;
+}
+
+CheckNumber {
+ 	0 (e.Number) = 'Even ' e.Number '\n';
+ 	1 (e.Number) = 'Odd ' e.Number '\n';
+}

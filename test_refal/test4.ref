@@ -1,0 +1,47 @@
+$ENTRY Go {
+  =
+  <CheckArg <Arg 1>>
+  <Open 'r' 3 <Arg 1>>
+  <Prout <Format <ReadLines <Get 3>>>>
+  <Close 3>;
+}
+
+CheckArg {
+	 = <Prout 'usage: content.ref <file>'> 
+	   <Exit 1>;
+	e.Argument = ;   
+}
+
+ReadLines {
+	0 = ;
+	e.Line 0 = e.Line '\n';
+	e.Line = e.Line '\n' <ReadLines <Get 3>>;
+}
+
+Format {
+   e.Lines = '<html><body>\n<h1>Оглавление</h1>\n' <AddTableContent 1 e.Lines> <FormatRec 1 e.Lines> '</body></html>';
+}
+
+Trim-Left {
+	' ' e.Line = <Trim-Left e.Line>;
+	'\t' e.Line = <Trim-Left e.Line>;
+	e.Line = e.Line;
+}
+
+FormatRec {
+	s.LineNumber '###' e.Line '\n' e.Lines = '<a name="#' <Symb s.LineNumber> '">' '<h3>' <Trim-Left e.Line> '</h3>\n' <FormatRec <Add s.LineNumber 1> e.Lines>;
+	s.LineNumber '##' e.Line '\n' e.Lines = '<a name="#' <Symb s.LineNumber> '">' '<h2>' <Trim-Left e.Line> '</h2>\n' <FormatRec <Add s.LineNumber 1> e.Lines> ; 
+	s.LineNumber '#' e.Line '\n' e.Lines = '<a name="#' <Symb s.LineNumber> '">' '<h1>' <Trim-Left e.Line> '</h1>\n' <FormatRec <Add s.LineNumber 1> e.Lines> ;
+	s.LineNumber '\n' e.Lines = '<p>\n' <FormatRec s.LineNumber e.Lines>;
+	s.LineNumber s.Symb e.Line '\n' e.Lines = s.Symb e.Line '\n' <FormatRec <Add s.LineNumber 1> e.Lines>;
+	s.LineNumber e.Line = e.Line; 
+}
+
+AddTableContent {
+	s.LineNumber '###' e.Line '\n' e.Lines = '<a href="#' <Symb s.LineNumber> '">' <Trim-Left e.Line> '</a><p>\n' <AddTableContent <Add s.LineNumber 1> e.Lines> ;
+	s.LineNumber '##' e.Line '\n' e.Lines = '<a href="#' <Symb s.LineNumber> '">' <Trim-Left e.Line> '</a><p>\n' <AddTableContent <Add s.LineNumber 1> e.Lines> ;
+	s.LineNumber '#' e.Line '\n' e.Lines = '<a href="#' <Symb s.LineNumber> '">' <Trim-Left e.Line> '</a><p>\n' <AddTableContent <Add s.LineNumber 1> e.Lines> ;
+	s.LineNumber '\n' e.Lines = <AddTableContent s.LineNumber e.Lines>;
+	s.LineNumber e.Line '\n' e.Lines = <AddTableContent <Add s.LineNumber 1> e.Lines>; 
+	s.LineNumber = ;
+}

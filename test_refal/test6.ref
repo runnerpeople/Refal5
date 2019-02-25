@@ -1,0 +1,47 @@
+$ENTRY Go {
+  =
+  <CheckArg <Arg 1>>
+  <CountWords 2 <Arg 2>>; /* выполнить подсчет слов для файлов */
+}
+
+CheckArg {
+	'+w' = ; /* если аргумент есть, то всё хорошо */
+	 = <Prout 'usage: wc-w.ref +w <file> <files...>'> /* иначе вывести ошибку */
+	   <Exit 1>;
+}
+
+CountWords {
+	s.NumArg = <Prout '      ' <DoCountWordsInput (0) <Card>>>;
+	s.NumArg e.File = <CountWordsRec s.NumArg e.File>;
+}
+
+CountWordsRec {
+	s.NumArg = /* пусто */;
+	s.NumArg e.File = 
+		<Open 'r' 3 e.File>
+		<Prout '      ' <DoCountWordsFile (0) <Get 3>> e.File>
+		<Close 3>
+		<CountWordsRec <Add s.NumArg 1> <Arg s.NumArg>>;
+}
+
+Trim-Left {
+	' ' e.Line = <Trim-Left e.Line>; /* удаляем пробелы слева */
+	'\t' e.Line = <Trim-Left e.Line>; /* удаляем табуляцию слева */
+	e.Line = e.Line; 
+}
+
+DoCountWordsFile {
+	(s.Count) ' ' e.String = <Prout s.Count <DoCountWordsFile (<Add 1 s.Count>) <Trim-Left e.String>>>;
+	(s.Count) '\t' e.String = <Prout s.Count <DoCountWordsFile (<Add 1 s.Count>) <Trim-Left e.String>>>;
+	(s.Count) 0 = s.Count;
+	(s.Count) s.Symbol e.String = s.Symbol <DoCountWordsFile (s.Count) e.String>;
+	(s.Count) e.String = <DoCountWordsFile (<Add s.Count 1>) <Get 3>>;
+}
+
+DoCountWordsInput {
+	(s.Count) ' ' e.String = <Prout s.Count <DoCountWordsInput (<Add 1 s.Count>) <Trim-Left e.String>>>;
+	(s.Count) '\t' e.String = <Prout s.Count <DoCountWordsInput (<Add 1 s.Count>) <Trim-Left e.String>>>;
+	(s.Count) 0 = s.Count;
+	(s.Count) s.Symbol e.String = s.Symbol <DoCountWordsInput (<Add s.Count 1>) e.String>;
+	(s.Count) e.String = <Prout s.Count <DoCountWordsInput (s.Count) <Card>>>;
+}

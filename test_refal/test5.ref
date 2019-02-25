@@ -1,0 +1,64 @@
+$ENTRY Go {
+  =
+  <CheckArg <Arg 1>>
+  <Open 'r' 3 <Arg 1>>
+  <Prout <Format <ReadLines <Get 3>>>>
+  <Close 3>;
+}
+
+CheckArg {
+	 = <Prout 'usage: content.ref <file>'> 
+	   <Exit 1>;
+	e.Argument = ;   
+}
+
+ReadLines {
+	0 = ;
+	e.Line 0 = e.Line '\n';
+	e.Line = e.Line '\n' <ReadLines <Get 3>>;
+}
+
+Format {
+   e.Lines = '<html><body>\n' <Fix <FormatRec e.Lines>> '</body></html>';
+}
+
+Trim-Left {
+	' ' e.Line = <Trim-Left e.Line>;
+	'\t' e.Line = <Trim-Left e.Line>;
+	e.Line = e.Line;
+}
+
+FormatRec {
+	'#####' e.Line '\n' e.Lines = '<h5>' <Trim-Left e.Line> '</h5>\n' <FormatRec e.Lines>;
+	'####' e.Line '\n' e.Lines = '<h4>' <Trim-Left e.Line> '</h4>\n' <FormatRec e.Lines>;
+	'###' e.Line '\n' e.Lines = '<h3>' <Trim-Left e.Line> '</h3>\n' <FormatRec e.Lines>;
+	'##' e.Line '\n' e.Lines = '<h2>' <Trim-Left e.Line> '</h2>\n' <FormatRec e.Lines>; 
+	'#' e.Line '\n' e.Lines = '<h1>' <Trim-Left e.Line> '</h1>\n' <FormatRec e.Lines>;
+	'    ' e.Line '\n' e.Lines = '<pre>\n' <CodeBlock '    ' e.Line '\n' e.Lines> '</pre>\n' <FormatRec <DeleteCodeBlock '    ' e.Line '\n' e.Lines>>;
+	e.BeforeString '*' e.String '*' e.AfterString = <FormatRec e.BeforeString '<b>' e.String '<b>' e.AfterString>;
+	e.BeforeString '/' e.String '/' e.AfterString = <FormatRec e.BeforeString '<i>' e.String '<i>' e.AfterString>;
+	e.BeforeString '_' e.String '_' e.AfterString = <FormatRec e.BeforeString '<u>' e.String '<u>' e.AfterString>;
+	e.BeforeString '~' e.String '~' e.AfterString = <FormatRec e.BeforeString '<strike>' e.String '<strike>' e.AfterString>;
+	'\n' e.Lines = '<p>\n' <FormatRec e.Lines>;
+	s.Symb e.Line '\n' e.Lines = s.Symb e.Line '\n' <FormatRec e.Lines>;
+	e.Line = e.Line;
+}
+
+CodeBlock {
+	'    ' e.Line '\n' e.Lines = '    ' e.Line '\n' <CodeBlock e.Lines>;
+	e.Line = ;
+}
+
+DeleteCodeBlock {
+	'    ' e.Line '\n' e.Lines = <DeleteCodeBlock e.Lines>;
+	e.Line = e.Line;
+}
+
+Fix {
+	e.BeforeString '<b>' e.String '<b>' e.AfterString = <Fix e.BeforeString '<b>' e.String '</b>' e.AfterString>;
+ 	e.BeforeString '<i>' e.String '<i>' e.AfterString = <Fix e.BeforeString '<i>' e.String '</i>' e.AfterString>;
+ 	e.BeforeString '<u>' e.String '<u>' e.AfterString = <Fix e.BeforeString '<u>' e.String '</u>' e.AfterString>;
+ 	e.BeforeString '<strike>' e.String '<strike>' e.AfterString = <Fix e.BeforeString '<strike>' e.String '</strike>' e.AfterString>;
+ 	e.Line '\n' e.Lines = e.Line '\n' <Fix e.Lines>;
+ 	e.Line = e.Line ;
+}

@@ -1,0 +1,17 @@
+/* $ENTRY Go { = <Scan <Card>> } */
+
+Scan {
+   0 = ;
+   e.X = <Prout <F 0 e.X>>
+         <Scan <Card>>;
+}
+
+F {
+    s.Count e.Items A =
+        <F <+ s.Count 1> e.Items>;
+
+    s.Count e.Items s.Other =
+        <F s.Count e.Items>;
+
+    s.Count /* пусть */ = s.Count;
+}
