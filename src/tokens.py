@@ -120,5 +120,3 @@ class EopToken(Token):
 
     def __str__(self):
         return ""
-
-

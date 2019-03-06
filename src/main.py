@@ -5,10 +5,11 @@ from os.path import *
 from src.lex_refal import *
 from src.parser_refal import *
 from src.parser_refal_type import *
+from src.algorithm import *
 
 TEST_DIRECTORY = join(dirname(dirname(__file__)), 'test_refal').replace("\\", "/")
 DEBUG_MODE = True
-NAME_FILE = "test3"
+NAME_FILE = "test8"
 
 REFAL_TYPE = ".ref"
 FILE_TYPE = ".type"
@@ -67,13 +68,17 @@ try:
         print(LINE_DELIMITER)
 
     if DEBUG_MODE:
-        print_sentence(parser_refal.sentences)
+        print(parser_refal.ast)
 
     if DEBUG_MODE:
         print(LINE_DELIMITER)
 
     parser_refal_type = ParserRefalType(list_token_type)
     parser_refal_type.parse()
+
+    if DEBUG_MODE:
+        pass
+
 
 except (FileNotFoundError, IOError) as e:
     sys.stderr.write(str(e))

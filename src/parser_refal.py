@@ -2,26 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from src.tokens import *
+from src.ast import *
 
 import sys
-
-
-def print_sentence(dict_function):
-    for key in dict_function.keys():
-        values = dict_function[key]
-        for value in values:
-            pattern = ", ".join(value[0])
-            term = ", ".join(value[1])
-            if not pattern:
-                pattern = "/* пусто */"
-            if not term:
-                term = "/* пусто */"
-            print(key, ":" , pattern, "->", term)
-
-
-def diff(first, second):
-    second = set(second)
-    return [item for item in first if item not in second]
 
 
 class ParserRefal(object):
@@ -31,39 +14,84 @@ class ParserRefal(object):
         self.iteratorTokens = iter(self.tokens)
         self.cur_token = next(self.iteratorTokens)
         self.isError = False
-        self.available_functions = ["Add", "Sub", "Mul", "Div", "Mod", "Residue"]
-        self.call_functions = []
-        self.sentences = dict()
+        self.ast = None
 
-        self.__depth = 0
+    def semantics_variable(self, sentences):
+        for sentence in sentences:
+            variables = []
+            for term in sentence.pattern.terms:
+                if isinstance(term, Variable):
+                    variables.append(term.value)
+            for condition in sentence.conditions:
+                for term in condition.pattern.terms:
+                    if isinstance(term, Variable):
+                        variables.append(term.value)
+                for term in condition.result.terms:
+                    if isinstance(term, Variable):
+                        if term.value not in variables:
+                            sys.stderr.write("Error. Variable %s%s isn't found in previous sentence" % term.value,
+                                             term.pos)
+                            self.isError = True
+            if sentence.block:
+                for block in sentence.block:
+                    self.semantics_variable(sentence.block)
+            for term in sentence.result.terms:
+                if term.value not in variables:
+                    sys.stderr.write("Error. Variable %s%s isn't found in previous sentence" % term.value,
+                                     term.pos)
+                    self.isError = True
+
+    def semantics(self):
+        names = set()
+        for function in self.ast.functions:
+            if function.name in names:
+                sys.stderr.write("Error. Function %s already defined" % function.name)
+                self.isError = True
+            else:
+                names.add(function.name)
+
+        for function in self.ast.functions:
+            if isinstance(function, Definition):
+                for sentence in function.sentences:
+                    for expression in sentence.result:
+                        for term in expression.terms:
+                            if isinstance(term, CallBrackets):
+                                if term.value not in names:
+                                    sys.stderr.write("Error. Function %s isn't defined" % function.name)
+                                    self.isError = True
+
+        for function in self.ast.functions:
+            if isinstance(function, Definition):
+                self.semantics_variable(function.sentences)
 
     def parse(self):
-        self.parse_program()
+        self.ast = AST(self.parse_program())
         if self.cur_token.tag != DomainTag.Eop:
             self.isError = True
             sys.stderr.write("Error. Expected Token \"End_Of_Program\"\n")
-        elif len(diff(self.call_functions, self.available_functions)) == 0:
-            self.isError = True
-            sys.stderr.write("Error. Some function aren't defined")
         else:
             sys.stdout.write("Ok. Program satisfy grammar\n")
 
     # Program ::= Global*
     def parse_program(self):
-        self.parse_global()
+        functions = self.parse_global()
         while self.cur_token.tag == DomainTag.Keyword or self.cur_token.tag == DomainTag.Ident or \
                 (self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ";"):
-            self.parse_global()
+            functions.extend(self.parse_global())
+        return functions
 
     # Global ::= Externs | Function | ';';
     def parse_global(self):
         if self.cur_token.tag == DomainTag.Keyword and self.cur_token.value == "$ENTRY" or \
                 self.cur_token.tag == DomainTag.Ident:
-            self.parse_function()
+            function = self.parse_function()
+            return function
         elif self.cur_token.tag == DomainTag.Keyword:
-            self.parse_externs()
+            externs = self.parse_externs()
+            return externs
         elif self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ";":
             self.cur_token = next(self.iteratorTokens)
+            return []
 
     # Externs ::= ExternKeyword 'Name' (',' 'Name')* ';';
     # ExternKeyword ::= '$EXTERN' | '$EXTRN' | '$EXTERNAL';
@@ -73,47 +101,45 @@ class ParserRefal(object):
         else:
             self.cur_token = next(self.iteratorTokens)
             if self.cur_token.tag == DomainTag.Ident:
-                if self.cur_token.value not in self.available_functions:
-                    self.available_functions.append(self.cur_token.value)
-                else:
-                    self.isError = True
-                    sys.stderr.write("Error. Function %s are redefined" % self.cur_token.value)
+                externs = [Extern(self.cur_token.value,self.cur_token.coords)]
                 self.cur_token = next(self.iteratorTokens)
                 while self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ",":
                     self.cur_token = next(self.iteratorTokens)
                     if self.cur_token.tag != DomainTag.Ident:
                         sys.stderr.write("Expected name of external function\n")
+                        return []
                     else:
-                        self.available_functions.append(self.cur_token.value)
+                        externs.append(Extern(self.cur_token.value,self.cur_token.coords))
                     self.cur_token = next(self.iteratorTokens)
                 if not (self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ";"):
                     sys.stderr.write("Expected \";\" after $EXTERNAL\n")
                 else:
                     self.cur_token = next(self.iteratorTokens)
+                    return externs
             else:
                 sys.stderr.write("Expected name of external function\n")
+        return []
 
     # Function ::= ('$ENTRY')? 'Name' Body;
     def parse_function(self):
+        is_entry = False
         if self.cur_token.tag == DomainTag.Keyword and self.cur_token.value == "$ENTRY":
             self.cur_token = next(self.iteratorTokens)
+            is_entry = True
         if self.cur_token.tag != DomainTag.Ident:
             sys.stderr.write("Expected name of function\n")
+            return []
         else:
             function_name = self.cur_token.value
-            if self.cur_token.value in self.available_functions:
-                self.isError = True
-                sys.stderr.write("Error. Function %s is redefined" % self.cur_token.value)
-            else:
-                self.available_functions.append(self.cur_token.value)
+            position = self.cur_token.coords
             self.cur_token = next(self.iteratorTokens)
-            self.sentences[function_name] = self.parse_body()
+            body = self.parse_body()
+            return [Definition(function_name,position,is_entry,body)]
 
     # Body ::= '{' Sentences '}';
     def parse_body(self):
         if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "{":
             self.cur_token = next(self.iteratorTokens)
-            self.__depth = 0
             sentences = self.parse_sentences()
             if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "}":
                 self.cur_token = next(self.iteratorTokens)
@@ -122,6 +148,7 @@ class ParserRefal(object):
             return sentences
         else:
             sys.stderr.write("Expected \"{\" after declaring function\n")
+            return []
 
     # Sentences ::= Sentence (';' Sentences?)?;
     def parse_sentences(self):
@@ -129,14 +156,7 @@ class ParserRefal(object):
         if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ";":
             self.cur_token = next(self.iteratorTokens)
             sentences = self.parse_sentences()
-            if sentences == []:
-                return sentence
-            else:
-                self.__depth += 1
-            if self.__depth >= 2:
-                sentence = [sentence,*sentences]
-            else:
-                sentence = [sentence,sentences]
+            sentence = [*sentence, *sentences]
             return sentence
         return sentence
 
@@ -146,22 +166,22 @@ class ParserRefal(object):
         if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "=":
             self.cur_token = next(self.iteratorTokens)
             result = self.parse_result()
-            return [pattern, result]
+            return [Sentence(pattern,[],result,[])]
         elif self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ",":
             self.cur_token = next(self.iteratorTokens)
             result = self.parse_result()
             if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ":":
                 self.cur_token = next(self.iteratorTokens)
                 if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "{":
-                    sentences = self.parse_body()
-                    return [pattern, result].append(sentences)
+                    body = self.parse_body()
+                    return [Sentence(pattern,[],result,body)]
                 else:
-                    sentence = self.parse_sentence()
-                    return [pattern, result].append(sentence)
+                    sentence = self.parse_sentence()[0]
+                    return [Sentence(pattern,[*sentence.conditions,Condition(result,sentence.pattern)],sentence.result,sentence.block)]
             else:
                 sys.stderr.write("Expected \":\" after declaring result\n")
-            return [pattern, result]
-        return []
+            return [Sentence(pattern,[],result,[])]
+        return [Sentence(pattern,[],None,[])]
         # else:
         #     sys.stderr.write("Expected \"=\" or \",\" after declaring pattern\n")
 
@@ -173,39 +193,45 @@ class ParserRefal(object):
                 or self.cur_token.tag == DomainTag.Variable \
                 or (self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "("):
             patternterm.extend(self.parse_patternterm())
-        return patternterm
+        return Expression(patternterm)
 
     # PatternTerm ::= Common | '(' Pattern ')';
     def parse_patternterm(self):
         if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "(":
+            pattern = []
             self.cur_token = next(self.iteratorTokens)
-            pattern = self.parse_pattern()
+            pattern.append(StructuralBrackets(self.parse_pattern().terms))
             if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ")":
                 self.cur_token = next(self.iteratorTokens)
+                return pattern
             else:
                 sys.stderr.write("Expected \")\" after declaring pattern\n")
-            return pattern
+            return []
         else:
             return self.parse_common()
 
     # Common ::= 'Name' | ''chars'' | ""common"" | '123' | 'e.Var' | ε;
     def parse_common(self):
         if self.cur_token.tag == DomainTag.Ident:
+            token = self.cur_token
             self.cur_token = next(self.iteratorTokens)
-            return []
+            return [CompoundSymbol(token.value)]
         elif self.cur_token.tag == DomainTag.Characters:
+            token = self.cur_token
             self.cur_token = next(self.iteratorTokens)
-            return []
+            return [Char(token.value)]
         elif self.cur_token.tag == DomainTag.Number:
+            token = self.cur_token
             self.cur_token = next(self.iteratorTokens)
-            return []
+            return [Macrodigit(token.value)]
         elif self.cur_token.tag == DomainTag.Composite_symbol:
+            token = self.cur_token
             self.cur_token = next(self.iteratorTokens)
-            return []
+            return [CompoundSymbol(token.value)]
         elif self.cur_token.tag == DomainTag.Variable:
             token = self.cur_token
             self.cur_token = next(self.iteratorTokens)
-            return [token.value]
+            return [Variable(token.value,Type[token.value[0]],token.coords)]
         else:
             return []
 
@@ -218,30 +244,28 @@ class ParserRefal(object):
                 or (self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "(") \
                 or (self.cur_token.tag == DomainTag.Left_bracket):
             resultterm.extend(self.parse_result_term())
-        return resultterm
+        return Expression(resultterm)
 
     # ResultTerm ::= Common | '(' Result ')' | '<Name' Result '>';
     def parse_result_term(self):
         if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "(":
             self.cur_token = next(self.iteratorTokens)
-            result = self.parse_result()
+            result = [StructuralBrackets(self.parse_result().terms)]
             if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ")":
                 self.cur_token = next(self.iteratorTokens)
+                return result
             else:
                 sys.stderr.write("Expected \")\" after declaring result\n")
-            return result
+            return []
         elif self.cur_token.tag == DomainTag.Left_bracket:
-            if self.cur_token.value[1:] not in self.call_functions:
-                self.call_functions.append(self.cur_token.value[1:])
-            elif self.cur_token.value[1:] not in self.available_functions:
-                self.isError = True
-                sys.stderr.write("Error. Function %s aren't defined" % self.cur_token.value[1:])
+            func_name = self.cur_token.value[1:]
+            pos = self.cur_token.coords
             self.cur_token = next(self.iteratorTokens)
-            result = self.parse_result()
+            result = self.parse_result().terms
             if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ">":
                 self.cur_token = next(self.iteratorTokens)
             else:
                 sys.stderr.write("Expected \">\" after declaring result\n")
-            return result
+            return [CallBrackets(func_name, pos, result)]
         else:
             return self.parse_common()

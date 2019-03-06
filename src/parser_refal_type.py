@@ -21,7 +21,7 @@ class ParserRefalType(object):
             self.isError = True
             sys.stderr.write("Error. Expected Token \"End_Of_Program\"\n")
         else:
-            sys.stdout.write("Ok. Program satisfy grammar\n")
+            sys.stdout.write("Ok. Program-Type satisfy grammar\n")
 
     # File ::= Function*
     def parse_file(self):
