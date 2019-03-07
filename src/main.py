@@ -8,7 +8,7 @@ from src.parser_refal_type import *
 from src.algorithm import *
 
 TEST_DIRECTORY = join(dirname(dirname(__file__)), 'test_refal').replace("\\", "/")
-DEBUG_MODE = True
+DEBUG_MODE = False
 NAME_FILE = "test10"
 
 REFAL_TYPE = ".ref"

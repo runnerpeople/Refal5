@@ -1,4 +1,6 @@
 F {
-    ((((s.X)))) = s.X;
-    (e.X) = <F e.X>;
+  e.X = <G e.X> <H e.X>;
 }
+
+G { s.Y e.Z = s.Y }
+H { e.Y (e.Z) = e.Z }

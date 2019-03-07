@@ -61,11 +61,11 @@ class ParserRefalType(object):
 
     # Format ::= Common ('e.Var' Common)?
     def parse_format(self):
-        format = self.parse_common()
+        format_function = self.parse_common()
         if self.cur_token.tag == DomainTag.Variable:
             self.cur_token = next(self.iteratorTokens)
-            format.extend(self.parse_common())
-        return Expression(format)
+            format_function.extend(self.parse_common())
+        return Expression(format_function)
 
     # Common ::= 'Name' | ''chars'' | '123' | 'e.Var' | ('(' Format ')')* | ε
     def parse_common(self):
@@ -98,6 +98,6 @@ class ParserRefalType(object):
             elif self.cur_token.tag == DomainTag.Variable:
                 token = self.cur_token
                 self.cur_token = next(self.iteratorTokens)
-                return [Variable(token.value,Type[token.value[0]],token.coords)]
+                return [Variable(token.value, Type[token.value[0]], token.coords)]
             else:
                 return []

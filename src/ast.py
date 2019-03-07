@@ -102,6 +102,12 @@ class Expression(object):
     def __init__(self, terms):
         self.terms = terms
 
+    def __eq__(self, other):
+        return self.terms == other.terms
+
+    def __hash__(self):
+        return hash(self.__str__())
+
     def __str__(self):
         return " ".join(list(map(str, self.terms)))
 
@@ -188,7 +194,7 @@ class Variable(Term):
         self.sentence_index = sentence_index
 
     def __eq__(self, other):
-        return self.value == other.value
+        return self.type_variable == other.type_variable and self.index == other.index
 
     def __str__(self):
         # return self.value

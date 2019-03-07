@@ -28,7 +28,7 @@ class ParserRefal(object):
                 variable.extend(self.get_variables(term))
             return variable
         elif isinstance(term, Variable):
-            return [term]
+            return [term.value]
         else:
             return []
 
