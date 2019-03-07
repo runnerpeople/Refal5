@@ -1,0 +1,8 @@
+/* built-in function */
+
+Add t.FirstNumber e.SecondNumber = e.NormedNumber;
+Sub t.FirstNumber e.SecondNumber = e.NormedNumber;
+Mul t.FirstNumber e.SecondNumber = e.NormedNumber;
+Div t.FirstNumber e.SecondNumber = e.NormedNumber;
+Mod t.FirstNumber e.SecondNumber = e.NormedNumber;
+Residue s.FuncPtr e.Arg = s.FuncPtr e.Arg;

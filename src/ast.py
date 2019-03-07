@@ -52,7 +52,18 @@ class Definition(Function):
         self.sentences = sentences
 
     def __str__(self):
-        return self.name + " {\n" + ";\n".join(list(map(str, self.sentences))) + "}"
+        return self.name + " {\n" + ";\n".join(list(map(str, self.sentences))) + ";\n}"
+
+
+class DefinitionType(Function):
+
+    def __init__(self, name, pattern, result, pos):
+        super(DefinitionType, self).__init__(name, pos)
+        self.pattern = pattern
+        self.result = result
+
+    def __str__(self):
+        return self.name + " " + str(self.pattern) + " = " + str(self.result)
 
 
 class Sentence(object):
@@ -110,6 +121,9 @@ class Char(Term):
     def __init__(self, value):
         super(Char, self).__init__(value)
 
+    def __eq__(self, other):
+        return self.value == other.value
+
     def __str__(self):
         return super(Char, self).__str__()
 
@@ -119,6 +133,9 @@ class Macrodigit(Term):
     def __init__(self, value):
         super(Macrodigit, self).__init__(value)
 
+    def __eq__(self, other):
+        return self.value == other.value
+
     def __str__(self):
         return super(Macrodigit, self).__str__()
 
@@ -127,6 +144,9 @@ class CompoundSymbol(Term):
 
     def __init__(self, value):
         super(CompoundSymbol, self).__init__(value)
+
+    def __eq__(self, other):
+        return self.value == other.value
 
     def __str__(self):
         return super(CompoundSymbol, self).__str__()
@@ -160,18 +180,21 @@ class Type(Enum):
 
 class Variable(Term):
 
-    def __init__(self, value, type_variable, pos, index=-1):
+    def __init__(self, value, type_variable, pos, index=-1, sentence_index=-1):
         super(Variable, self).__init__(value)
         self.type_variable = type_variable
         self.index = index
         self.pos = pos
+        self.sentence_index = sentence_index
 
+    def __eq__(self, other):
+        return self.value == other.value
 
     def __str__(self):
-        return self.value
-        # if self.type_variable == Type.s:
-        #     return "s." + str(self.index)
-        # elif self.type_variable == Type.t:
-        #     return "t." + str(self.index)
-        # elif self.type_variable == Type.e:
-        #     return "e." + str(self.index)
+        # return self.value
+        if self.type_variable == Type.s:
+            return "s." + str(self.index)
+        elif self.type_variable == Type.t:
+            return "t." + str(self.index)
+        elif self.type_variable == Type.e:
+            return "e." + str(self.index)

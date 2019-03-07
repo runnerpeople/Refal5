@@ -1,3 +1,4 @@
+$EXTERN Prout, Card;
 /* $ENTRY Go { = <Scan <Card>> } */
 
 Scan {
