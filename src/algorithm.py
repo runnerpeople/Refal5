@@ -7,7 +7,7 @@ from copy import deepcopy
 
 import math
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 def generate_index():
@@ -31,7 +31,7 @@ def is_hard_term(term):
         else:
             return True
     elif isinstance(term, CallBrackets):
-        return False
+        return True
     else:
         return True
 
@@ -86,14 +86,21 @@ class SpecialVariable(Term):
             return super(SpecialVariable, self).__str__()
 
 
+class EqType(Enum):
+    Term = 1
+    Expr = 2
+
+
 class Equation(object):
 
-    def __init__(self, left_part, right_part):
+    def __init__(self, left_part, right_part, type_equation):
         self.left_part = left_part
         self.right_part = right_part
+        self.type_equation = type_equation
 
     def __eq__(self, other):
-        return self.left_part == other.left_part and self.right_part == other.right_part
+        return self.left_part == other.left_part and self.right_part == other.right_part and \
+               self.type_equation == other.type_equation
 
     def __str__(self):
         return str(self.left_part) + " : " + str(self.right_part)
@@ -125,72 +132,260 @@ class Calculation(object):
         if DEBUG_MODE:
             print(self.ast)
 
+        self.default_format_function = []
+
+        self.prepare_default_format_function()
+
         self.format_function = []
         self.substitution = []
 
-        self.equation = self.create_equation()
+        self.system = self.create_equation()
 
-        while len(self.equation) > 0:
-            for equation in self.equation:
-                eq = deepcopy(equation)
-                substitution = []
-                eq.left_part = self.apply_substitution(eq.left_part, [*substitution, *self.format_function])
-                eq.right_part = self.apply_substitution(eq.right_part, [*substitution, *self.format_function])
-
-                if not (len(eq.right_part.terms) >= 1 and isinstance(eq.right_part.terms[0], SpecialVariable) and
-                                                       eq.right_part.terms[0].type_variable == SpecialType.none) and \
-                        len(eq.right_part.terms) >= 0:
-                    self.calculate_equation(eq, substitution)
-                else:
-                    substitution = [Substitution(eq.left_part, eq.right_part)]
-
-
-                ast = deepcopy(self.ast)
-
-                for function in ast.functions:
-                    if isinstance(function, Definition):
-                        for sentence in function.sentences:
-                            sentence.pattern = self.apply_substitution(sentence.pattern, [*substitution, *self.format_function])
-                            sentence.result = self.apply_substitution(sentence.result, [*substitution, *self.format_function])
-
-
+        if len(self.system) == 0:
+            while True:
+                format_substitution_function = []
                 for function in ast.functions:
                     if isinstance(function, Definition):
                         for sentence in function.sentences:
 
-                            self.format_function.append(Substitution(
+                            format_substitution_function.append(Substitution(
                                 Expression([SpecialVariable(function.name, SpecialType.in_function)]),
                                 sentence.pattern))
 
-                            if all(self.contains_call(term) == False for term in sentence.result.terms):
-                                self.format_function.append(Substitution(
-                                    Expression([SpecialVariable(function.name, SpecialType.out_function)]),
-                                    sentence.result))
+                            format_substitution_function.append(Substitution(
+                                Expression([SpecialVariable(function.name, SpecialType.out_function)]),
+                                sentence.result))
                 group_generalization = dict()
-                for subst in [*substitution, *self.format_function]:
+                for subst in [*format_substitution_function, *self.default_format_function]:
                     if subst.left_part not in group_generalization:
-                        group_generalization[subst.left_part] = [subst.right_part]
+                        group_generalization[subst.left_part] = [deepcopy(subst.right_part)]
                     else:
-                        group_generalization[subst.left_part].append(subst.right_part)
+                        group_generalization[subst.left_part].append(deepcopy(subst.right_part))
 
                 format_functions = []
                 for key_group in group_generalization.keys():
                     format_function = self.generalization(group_generalization[key_group])
                     format_functions.append(Substitution(key_group, format_function))
 
-                format_functions = [format_function for format_function in format_functions
-                                    if isinstance(format_function.left_part.terms[0],SpecialVariable)]
+                format_functions_result = [format_function for format_function in format_functions
+                                           if isinstance(format_function.left_part.terms[0], SpecialVariable)]
 
-                if format_functions == self.format_function:
-                    self.equation.remove(equation)
-                else:
-                    self.format_function = format_functions
+                substitution_result = []
+                for format_function in format_functions:
+                    if not isinstance(format_function.left_part.terms[0], SpecialVariable) \
+                            and not format_function.right_part.terms == [SpecialVariable("@", SpecialType.none)]:
+                        substitution_result.append(format_function)
+
+                # self.substitution = [format_function for format_function in format_functions
+                #                      if not isinstance(format_function.left_part.terms[0], SpecialVariable)
+                #                      and not format_function.right_part.terms == [SpecialVariable("@", SpecialType.none)]
+                #                      ]
+
+                if self.is_fixed_point(self.format_function, format_functions_result):
                     break
+                else:
+                    self.format_function = format_functions_result
+                    self.substitution = substitution_result
+                    break
+        else:
+            while len(self.system) > 0:
+                for k in range(len(self.system)):
+                    eq = deepcopy(self.system[k])
+                    # eq = self.system[k]
+                    substitution = deepcopy(self.substitution)
 
+                    eq.left_part = self.apply_substitution(eq.left_part, [*substitution, *self.format_function, *self.default_format_function])
+                    eq.right_part = self.apply_substitution(eq.right_part, [*substitution, *self.format_function, *self.default_format_function])
+
+                    if not (len(eq.right_part.terms) >= 1 and isinstance(eq.right_part.terms[0], SpecialVariable) and
+                            eq.right_part.terms[0].type_variable == SpecialType.none) and \
+                            len(eq.right_part.terms) >= 0:
+                        _, substitution, self.system, eq = self.calculate_equation(eq, substitution, self.system)
+                    else:
+                        substitution = [Substitution(eq.left_part, eq.right_part)]
+
+                    ast = deepcopy(self.ast)
+
+                    for function in ast.functions:
+                        if isinstance(function, Definition):
+                            for sentence in function.sentences:
+                                sentence.pattern = self.apply_substitution(sentence.pattern,
+                                                                           [*substitution, *self.format_function])
+                                sentence.result = self.apply_substitution(sentence.result,
+                                                                          [*substitution, *self.format_function])
+                    format_substitution_function = []
+                    for function in ast.functions:
+                        if isinstance(function, Definition):
+                            for sentence in function.sentences:
+
+                                format_substitution_function.append(Substitution(
+                                    Expression([SpecialVariable(function.name, SpecialType.in_function)]),
+                                    sentence.pattern))
+
+                                if all(self.contains_call(term) == False for term in sentence.result.terms):
+                                    format_substitution_function.append(Substitution(
+                                        Expression([SpecialVariable(function.name, SpecialType.out_function)]),
+                                        sentence.result))
+                    group_generalization = dict()
+                    for subst in [*substitution, *format_substitution_function, *self.default_format_function]:
+                        if subst.left_part not in group_generalization:
+                            group_generalization[subst.left_part] = [deepcopy(subst.right_part)]
+                        else:
+                            group_generalization[subst.left_part].append(deepcopy(subst.right_part))
+
+                    format_functions = []
+                    for key_group in group_generalization.keys():
+                        format_function = self.generalization(group_generalization[key_group])
+                        format_functions.append(Substitution(key_group, format_function))
+
+                    format_functions_result = [format_function for format_function in format_functions
+                                               if isinstance(format_function.left_part.terms[0], SpecialVariable)]
+
+                    substitution_result = []
+                    for format_function in format_functions:
+                        if not isinstance(format_function.left_part.terms[0], SpecialVariable) \
+                                and not format_function.right_part.terms == [SpecialVariable("@", SpecialType.none)]:
+                            substitution_result.append(format_function)
+
+                    # self.substitution = [format_function for format_function in format_functions
+                    #                      if not isinstance(format_function.left_part.terms[0], SpecialVariable)
+                    #                      and not format_function.right_part.terms == [SpecialVariable("@", SpecialType.none)]
+                    #                      ]
+
+                    if self.is_fixed_point(self.format_function, format_functions_result):
+                        self.system.remove(self.system[k])
+                        break
+                    else:
+                        self.format_function = format_functions_result
+                        self.substitution = substitution_result
+                        break
+
+        self.print_format_function()
+
+        if DEBUG_MODE:
+            for substitution in self.substitution:
+                print(substitution)
+
+    def prepare_default_format_function(self):
+
+        call_functions = []
+
+        for function in self.ast.functions:
+            if isinstance(function, Definition):
+                for sentence in function.sentences:
+                    for term_result in sentence.result.terms:
+                        call_functions.extend(self.get_call(term_result))
+
+        call_functions = list(set(call_functions))
+
+        for definition_type_function in self.ast_type.functions:
+            if isinstance(definition_type_function, DefinitionType):
+                for call_function in call_functions:
+                    if definition_type_function.name == call_function:
+                        in_format = Expression([SpecialVariable(definition_type_function.name, SpecialType.in_function)])
+                        out_format = Expression([SpecialVariable(definition_type_function.name, SpecialType.out_function)])
+                        self.default_format_function.append(Substitution(in_format, definition_type_function.pattern))
+                        self.default_format_function.append(Substitution(out_format, definition_type_function.result))
+
+
+    def print_format_function(self):
+        for function in self.ast.functions:
+            if isinstance(function, Definition):
+                in_format = Expression([SpecialVariable(function.name, SpecialType.in_function)])
+                out_format = Expression([SpecialVariable(function.name, SpecialType.out_function)])
+                print(function.name, end=' ')
+                for format_function in self.format_function:
+                    if format_function.left_part == in_format:
+                        pattern = self.apply_substitution(format_function.right_part, [*self.substitution])
+                        print(' '.join(list(map(self.print_term, pattern.terms))), end=' ')
+                    if format_function.left_part == out_format:
+                        print("=", end=' ')
+                        result = self.apply_substitution(format_function.right_part, [*self.substitution])
+                        print(' '.join(list(map(self.print_term, result.terms))), end='')
+                print()
+
+    def print_term(self, term):
+        if isinstance(term, StructuralBrackets):
+            output = '('
+            output += ', '.join(list(map(self.print_term, term.value)))
+            output += ')'
+            return output
+        if isinstance(term, Variable):
+            return term.type_variable.name
+        else:
+            return term.__str__()
+
+    def is_fixed_point(self, before_format, after_format):
+        common_format = dict()
+        for format_function in before_format:
+            if format_function.left_part not in common_format:
+                common_format[format_function.left_part] = [format_function.right_part]
+            else:
+                common_format[format_function.left_part].append(format_function.right_part)
+
+        for format_function in after_format:
+            if format_function.left_part not in common_format:
+                common_format[format_function.left_part] = [format_function.right_part]
+            else:
+                common_format[format_function.left_part].append(format_function.right_part)
+
+        for key_group in common_format.keys():
+            if len(common_format[key_group]) == 1 or len(common_format[key_group][0].terms) != len(
+                    common_format[key_group][1].terms):
+                return False
+            else:
+                for i in range(len(common_format[key_group][0].terms)):
+
+                    if isinstance(common_format[key_group][0].terms[i], StructuralBrackets) and \
+                            isinstance(common_format[key_group][1].terms[i], StructuralBrackets):
+
+                        before_common_format_brackets = [
+                            Substitution(key_group, Expression(common_format[key_group][0].terms[i].value))]
+                        after_common_format_brackets = [
+                            Substitution(key_group, Expression(common_format[key_group][0].terms[i].value))]
+
+                        if not self.is_fixed_point(before_common_format_brackets, after_common_format_brackets):
+                            return False
+
+                    elif not (isinstance(common_format[key_group][0].terms[i], Variable) and
+                              isinstance(common_format[key_group][1].terms[i], Variable) and
+                              common_format[key_group][0].terms[i].type_variable == common_format[key_group][1].terms[
+                                  i].type_variable) and \
+                            not common_format[key_group][0].terms[i] == common_format[key_group][1].terms[i]:
+
+                        # print(isinstance(common_format[key_group][0].terms[i], Variable))
+                        # print(isinstance(common_format[key_group][0].terms[i], Variable))
+                        # if (isinstance(common_format[key_group][0].terms[i], Variable) and isinstance(
+                        #         common_format[key_group][0].terms[i], Variable)):
+                        #     print(
+                        #         common_format[key_group][0].terms[i].type_variable == common_format[key_group][1].terms[
+                        #             i].type_variable)
+                        # print(common_format[key_group][0].terms[i] == common_format[key_group][1].terms[i])
+                        # print(common_format[key_group][0].terms[i])
+                        # print(common_format[key_group][1].terms[i])
+                        return False
+
+        return True
+
+    def get_call(self, term):
+        if isinstance(term, StructuralBrackets):
+            term_call = []
+            for terms in term.value:
+                term_call.extend(self.get_call(terms))
+            return term_call
+        elif isinstance(term, CallBrackets):
+            term_call = [term.value]
+            for terms in term.content:
+                term_call.extend(self.get_call(terms))
+            return term_call
+        elif isinstance(term, Variable):
+            return []
+        else:
+            return []
 
     def contains_call(self, term):
         if isinstance(term, StructuralBrackets):
-            return any(isinstance(term, CallBrackets) for term in term.value)
+            return any(self.contains_call(term) for term in term.value)
         elif isinstance(term, CallBrackets):
             return True
         elif isinstance(term, Variable):
@@ -262,7 +457,7 @@ class Calculation(object):
                 for substitution in subst:
                     if substitution.left_part.terms[0] == term:
                         exists_substitution = True
-                        res += substitution.right_part.terms
+                        res += self.apply_substitution(substitution.right_part, subst).terms
                 if not exists_substitution:
                     res += [term]
             elif isinstance(term, StructuralBrackets):
@@ -278,13 +473,13 @@ class Calculation(object):
                 equations = []
                 for sentence in function.sentences:
                     for i in range(len(sentence.result.terms)):
-                        term = [sentence.result.terms[i]]
-                        for j in range(len(term)):
-                            if isinstance(term[j], CallBrackets):
-                                equations.extend(self.refactor(term[j].content, term[j].value))
-                                # term[j] = SpecialVariable(term[j].value, SpecialType.out_function)
-                            elif isinstance(term[j], StructuralBrackets):
-                                equations.extend(self.refactor(term[j].value, None))
+                        if isinstance(sentence.result.terms[i], CallBrackets):
+                            equations.extend(
+                                self.refactor(sentence.result.terms[i].content, sentence.result.terms[i].value))
+                            sentence.result.terms[i] = SpecialVariable(sentence.result.terms[i].value,
+                                                                       SpecialType.out_function)
+                        elif isinstance(sentence.result.terms[i], StructuralBrackets):
+                            equations.extend(self.refactor(sentence.result.terms[i].value, None))
                 self.format_function.append(
                     Substitution(Expression([SpecialVariable(function.name, SpecialType.in_function)]),
                                  Expression([SpecialVariable("@", SpecialType.none)])))
@@ -294,107 +489,166 @@ class Calculation(object):
                 all_equations.extend(equations)
         return all_equations
 
-    def term_match(self, term_left, term_right, substitution):
-        if is_symbol(term_left) and is_symbol(term_right) and term_left == term_right:
-            return "Success"
-        elif isinstance(term_right, Variable) and term_right.type_variable == Type.t:
-            self.substitution.append(Substitution(term_left, term_right))
-            return "Success"
-        elif (isinstance(term_right, Variable) and term_right.type_variable == Type.s) or is_symbol(term_right):
-            self.substitution.append(Substitution(term_left, term_right))
-            return "Success"
-        elif isinstance(term_left, StructuralBrackets) and isinstance(term_right, StructuralBrackets):
-            self.calculate_equation(Equation(term_left.value, term_right.value), substitution)
-            return "Success"
-        else:
-            return "Failure"
-
     # match equation E : He
-    def calculate_equation(self, equation, substitution):
-        if equation.left_part.terms == [] and equation.right_part.terms == []:
-            return "Success"
+    def calculate_equation(self, equation, substitution, system):
+        eq = deepcopy(equation)
+        if eq.left_part.terms == [] and eq.right_part.terms == []:
+            return "Success", substitution, system, eq
         else:
+            if eq.type_equation == EqType.Term:
 
-            if len(equation.left_part.terms) > 0 and is_hard_term(equation.left_part.terms[0]) \
-                    and len(equation.right_part.terms) > 0 and is_hard_term(equation.right_part.terms[0]):
-                status = self.term_match(equation.left_part.terms.pop(0), equation.right_part.terms.pop(0),
-                                         substitution)
-                return self.calculate_equation(equation, substitution)
+                term_left = eq.left_part.terms[0]
+                term_right = eq.right_part.terms[0]
 
-            if len(equation.left_part.terms) > 0 and is_hard_term(equation.left_part.terms[-1]) \
-                    and len(equation.right_part.terms) > 0 and is_hard_term(equation.right_part.terms[-1]):
-                status = self.term_match(equation.left_part.terms.pop(), equation.right_part.terms.pop(),
-                                         substitution)
-                return self.calculate_equation(equation, substitution)
-
-            if len(equation.left_part.terms) == 0:
-
-                if len(equation.right_part.terms) > 0 and is_hard_term(equation.right_part.terms[0]):
-                    # self.isError = True
-                    return "Failure"
-
-                if len(equation.right_part.terms) == 0:
-                    return "Success"
-
-                if any(isinstance(term, Variable) and term.type_variable == Type.e for term in equation.right_part.terms):
-                    return "Success"
-
-                return "Undefined"
-
-            if len(equation.left_part.terms) > 0 and isinstance(equation.left_part.terms[0], Variable) and \
-                    equation.left_part.terms[0].type_variable == Type.e and len(equation.right_part.terms) > 0 and is_hard_term(equation.right_part.terms[0]):
-                left_part = equation.left_part.terms.pop(0)
-                first_substitution = [*substitution, Substitution(left_part, Expression([]))]
-                status = self.calculate_equation(equation, first_substitution)
-                if status == "Failure":
-                    index = generate_index()
-                    t_variable = Variable("generated%d".format(index), Type.t, None, index)
-                    index = generate_index()
-                    e_variable = Variable("generated%d".format(index), Type.e, None, index)
-                    second_substitution = [*substitution,
-                                           Substitution(left_part, Expression([t_variable, e_variable]))]
-                    equation.left_part.terms.insert(0, t_variable)
-                    equation.left_part.terms.insert(1, e_variable)
-                    return self.calculate_equation(equation, second_substitution)
-            if len(equation.left_part.terms) > 0 and isinstance(equation.left_part.terms[-1], Variable) and \
-                    equation.left_part.terms[-1].type_variable == Type.e and len(equation.right_part.terms) > 0 and is_hard_term(equation.right_part.terms[-1]):
-                left_part = equation.left_part.terms.pop()
-                first_substitution = [*substitution, Substitution(left_part, Expression([]))]
-                status = self.calculate_equation(equation, first_substitution)
-                if status == "Failure":
-                    index = generate_index()
-                    t_variable = Variable("generated%d".format(index), Type.t, None, index)
-                    index = generate_index()
-                    e_variable = Variable("generated%d".format(index), Type.e, None, index)
-                    second_substitution = [*substitution,
-                                           Substitution(left_part, Expression([t_variable, e_variable]))]
-                    equation.left_part.terms.insert(len(equation.left_part.terms) - 2, t_variable)
-                    equation.left_part.terms.insert(len(equation.left_part.terms) - 2, e_variable)
-                    return self.calculate_equation(equation, second_substitution)
-
-            if len(equation.right_part.terms) == 0:
-                if all(isinstance(term, Variable) and term.type_variable == Type.e for term in equation.left_part.terms):
-                    for term in equation.left_part.terms:
-                        substitution.append(Substitution(equation.left_part, Expression([])))
-                    return "Success"
+                if isinstance(term_right, Variable) and isinstance(term_left, Variable) and term_left == term_right:
+                    return "Success", substitution, system, eq
+                if is_symbol(term_left) and is_symbol(term_right) and term_left == term_right:
+                    return "Success", substitution, system, eq
+                elif isinstance(term_right, Variable) and term_right.type_variable == Type.t:
+                    substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
+                    return "Success", substitution, system, eq
+                elif (isinstance(term_right, Variable) and term_right.type_variable == Type.s) or is_symbol(term_right):
+                    substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
+                    return "Success", substitution, system, eq
+                elif isinstance(term_left, StructuralBrackets) and isinstance(term_right, StructuralBrackets):
+                    eq.type = EqType.Expr
+                    eq.left_part.terms = Expression(term_left.value)
+                    eq.right_part.terms = Expression(term_right.value)
+                    return self.calculate_equation(equation, substitution, system)
+                elif isinstance(term_right, StructuralBrackets) and isinstance(term_left,
+                                                                               Variable) and term_left.type_variable == Type.t:
+                    substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
+                    return "Success", substitution, system, eq
                 else:
-                    return "Failure"
-
-            # exists_e_variable_out = False
-            # for term in equation.right_part.terms:
-            #     if isinstance(term, Variable) and term.type_variable == Type.e:
-            #         exists_e_variable_out = True
-            #         substitution.append(Substitution(equation.left_part, Expression(term)))
-            #         break
-            # if exists_e_variable_out:
-            if len(equation.right_part.terms) > 0:
-                if all(isinstance(term, Variable) and term.type_variable == Type.e for term in equation.right_part.terms):
-                    return "Success"
-                else:
-                    return "Failure"
+                    return "Failure", [], system, eq
 
             else:
-                return "Undefined"
+                if len(eq.left_part.terms) > 0 and is_hard_term(eq.left_part.terms[0]) \
+                        and len(eq.right_part.terms) > 0 and is_hard_term(eq.right_part.terms[0]):
+
+                    subst = deepcopy(substitution)
+                    syst = deepcopy(system)
+
+                    status, subst, syst, e = self.calculate_equation(Equation(Expression([eq.left_part.terms[0]]),
+                                                                              Expression([eq.right_part.terms[0]]),
+                                                                              EqType.Term), subst, syst)
+
+                    eq.left_part.terms = eq.left_part.terms[1:]
+                    eq.right_part.terms = eq.right_part.terms[1:]
+
+                    if status == "Success":
+                        substitution = subst
+                        system = syst
+
+                    else:
+                        return "Failure", substitution, system, eq
+
+                elif len(eq.left_part.terms) > 0 and is_hard_term(eq.left_part.terms[-1]) \
+                        and len(eq.right_part.terms) > 0 and is_hard_term(eq.right_part.terms[-1]):
+
+                    subst = deepcopy(substitution)
+                    syst = deepcopy(system)
+
+                    status, subst, syst, e = self.calculate_equation(Equation(Expression([eq.left_part.terms[-1]]),
+                                                                              Expression([eq.right_part.terms[-1]]),
+                                                                              EqType.Term), subst, syst)
+
+                    eq.left_part.terms = eq.left_part.terms[:-1]
+                    eq.right_part.terms = eq.right_part.terms[:-1]
+
+                    if status == "Success":
+                        substitution = subst
+                        system = syst
+
+                    else:
+                        return "Failure", substitution, system, eq
+
+                if len(eq.left_part.terms) == 0:
+
+                    if len(eq.right_part.terms) > 0 and is_hard_term(eq.right_part.terms[0]):
+                        # self.isError = True
+                        return "Failure", [], system, eq
+
+                    if len(eq.right_part.terms) == 0:
+                        return "Success", substitution, system, eq
+
+                    if any(isinstance(term, Variable) and term.type_variable == Type.e for term in
+                           eq.right_part.terms):
+                        return "Success", substitution, system, eq
+
+                    return "Undefined", [], system
+
+                if len(eq.left_part.terms) > 0 and isinstance(eq.left_part.terms[0], Variable) and \
+                        eq.left_part.terms[0].type_variable == Type.e and len(
+                    eq.right_part.terms) > 0 and is_hard_term(eq.right_part.terms[0]):
+                    left_part = eq.left_part.terms.pop(0)
+                    first_substitution = [*substitution, Substitution(Expression([left_part]), Expression([]))]
+
+                    syst = deepcopy(system)
+
+                    status, subst, syst, equation_new = self.calculate_equation(eq, first_substitution, syst)
+                    if status == "Failure":
+                        index = generate_index()
+                        t_variable = Variable("generated%d".format(index), Type.t, None, index)
+                        index = generate_index()
+                        e_variable = Variable("generated%d".format(index), Type.e, None, index)
+                        second_substitution = [*substitution,
+                                               Substitution(Expression([left_part]),
+                                                            Expression([t_variable, e_variable]))]
+                        eq.left_part.terms.insert(0, t_variable)
+                        eq.left_part.terms.insert(1, e_variable)
+                        return self.calculate_equation(eq, second_substitution, syst)
+                    else:
+                        return status, subst, syst, equation_new
+                if len(eq.left_part.terms) > 0 and isinstance(eq.left_part.terms[-1], Variable) and \
+                        eq.left_part.terms[-1].type_variable == Type.e and len(
+                    eq.right_part.terms) > 0 and is_hard_term(eq.right_part.terms[-1]):
+                    left_part = eq.left_part.terms.pop()
+                    first_substitution = [*substitution, Substitution(Expression([left_part]), Expression([]))]
+
+                    syst = deepcopy(system)
+
+                    status, subst, syst, equation_new = self.calculate_equation(eq, first_substitution, syst)
+                    if status == "Failure":
+                        index = generate_index()
+                        t_variable = Variable("generated%d".format(index), Type.t, None, index)
+                        index = generate_index()
+                        e_variable = Variable("generated%d".format(index), Type.e, None, index)
+                        second_substitution = [*substitution,
+                                               Substitution(Expression([left_part]),
+                                                            Expression([e_variable, t_variable]))]
+                        eq.left_part.terms.insert(len(eq.left_part.terms), e_variable)
+                        eq.left_part.terms.insert(len(eq.left_part.terms), t_variable)
+                        return self.calculate_equation(eq, second_substitution, system)
+                    else:
+                        return status, subst, syst, equation_new
+
+                if len(eq.right_part.terms) == 0:
+                    if all(isinstance(term, Variable) and term.type_variable == Type.e for term in
+                           eq.left_part.terms):
+                        for term in eq.left_part.terms:
+                            substitution.append(Substitution(eq.left_part, Expression([])))
+                        return "Success", substitution, system, eq
+                    else:
+                        return "Failure", [], system, eq
+
+                # exists_e_variable_out = False
+                # for term in equation.right_part.terms:
+                #     if isinstance(term, Variable) and term.type_variable == Type.e:
+                #         exists_e_variable_out = True
+                #         substitution.append(Substitution(equation.left_part, Expression(term)))
+                #         break
+                # if exists_e_variable_out:
+                if len(eq.right_part.terms) > 0:
+                    if all(isinstance(term, Variable) and term.type_variable == Type.e for term in
+                           eq.right_part.terms):
+                        # substitution.append()
+                        return "Success", substitution, system, eq
+                    else:
+                        return "Failure", [], system, eq
+
+                else:
+                    return "Undefined", [], system, eq
 
     def refactor(self, terms, func_name):
         equations = []
@@ -410,7 +664,7 @@ class Calculation(object):
                 left_part.append(term[j])
         if func_name is not None:
             in_variable = Expression([SpecialVariable(func_name, SpecialType.in_function)])
-            return [Equation(Expression(left_part), in_variable), *equations]
+            return [Equation(Expression(left_part), in_variable, EqType.Expr), *equations]
         else:
             return equations
 
@@ -437,7 +691,7 @@ class Calculation(object):
         if isinstance(term_right, Variable) and term_right.type_variable == Type.t:
             return term_right
         if isinstance(term_left, StructuralBrackets) and isinstance(term_right, StructuralBrackets):
-            return self.generalization([term_left.value, term_right.value])
+            return self.generalization([Expression(term_left.value), Expression(term_right.value)])
         if isinstance(term_left, StructuralBrackets):
             index = generate_index()
             return Variable("generated%d".format(index), Type.t, None, index)
@@ -448,13 +702,18 @@ class Calculation(object):
     def generalization_term(self, terms):
         while len(terms) > 1:
             term = self.generalization_term_rec(terms.pop(), terms.pop())
-            terms.append(term)
+            if isinstance(term, Expression):
+                terms.extend(term.terms)
+            else:
+                terms.append(term)
         return terms[0]
 
     def generalization(self, patterns):
         if len(patterns) > 1:
             for pattern in patterns:
-                special_value = any(isinstance(term, SpecialVariable) and term.type_variable == SpecialType.none for term in pattern.terms)
+                special_value = any(
+                    isinstance(term, SpecialVariable) and term.type_variable == SpecialType.none for term in
+                    pattern.terms)
                 if special_value:
                     patterns.remove(pattern)
                     return self.generalization(patterns)

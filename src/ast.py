@@ -4,7 +4,12 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
-DEFAULT_FUNCTIONS = ["Add", "Sub", "Mul", "Div", "Mod", "Residue"]
+DEFAULT_FUNCTIONS = ["Mu", "Add", "Arg", "Br", "Card", "Chr", "Cp", "Dg", "Dgall", "Div", "Divmod",
+                     "Explode", "First", "Get", "Implode", "Last", "Lenw", "Lower", "Mod", "Mul",
+                     "Numb", "Open", "Ord", "Print", "Prout", "Put", "Putout", "Rp", "Step",
+                     "Sub", "Symb", "Time", "Type", "Upper", "Freeze", "Freezer", "Dn",
+                     "Up", "Ev-met", "Residue", "System", "Exit", "Close", "ExistFile", "GetCurrentDirectory",
+                     "RemoveFile", "SizeOf", "GetPID"]
 
 
 class AST(object):
