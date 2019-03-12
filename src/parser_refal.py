@@ -115,6 +115,7 @@ class ParserRefal(object):
     def parse_externs(self):
         if self.cur_token.value == "$ENTRY":
             sys.stderr.write("Expected keyword: $EXTERN|$EXTRN|$EXTERNAL\n")
+            self.isError = True
         else:
             self.cur_token = next(self.iteratorTokens)
             if self.cur_token.tag == DomainTag.Ident:
@@ -124,17 +125,20 @@ class ParserRefal(object):
                     self.cur_token = next(self.iteratorTokens)
                     if self.cur_token.tag != DomainTag.Ident:
                         sys.stderr.write("Expected name of external function\n")
+                        self.isError = True
                         return []
                     else:
                         externs.append(Extern(self.cur_token.value, self.cur_token.coords))
                     self.cur_token = next(self.iteratorTokens)
                 if not (self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ";"):
                     sys.stderr.write("Expected \";\" after $EXTERNAL\n")
+                    self.isError = True
                 else:
                     self.cur_token = next(self.iteratorTokens)
                     return externs
             else:
                 sys.stderr.write("Expected name of external function\n")
+                self.isError = True
         return []
 
     # Function ::= ('$ENTRY')? 'Name' Body;
@@ -145,6 +149,7 @@ class ParserRefal(object):
             is_entry = True
         if self.cur_token.tag != DomainTag.Ident:
             sys.stderr.write("Expected name of function\n")
+            self.isError = True
             return []
         else:
             function_name = self.cur_token.value
@@ -162,9 +167,11 @@ class ParserRefal(object):
                 self.cur_token = next(self.iteratorTokens)
             else:
                 sys.stderr.write("Expected \"}\" after declaring function\n")
+                self.isError = True
             return sentences
         else:
             sys.stderr.write("Expected \"{\" after declaring function\n")
+            self.isError = True
             return []
 
     # Sentences ::= Sentence (';' Sentences?)?;
@@ -199,6 +206,7 @@ class ParserRefal(object):
                                  sentence.block)]
             else:
                 sys.stderr.write("Expected \":\" after declaring result\n")
+                self.isError = True
             return [Sentence(pattern, [], result, [])]
         return []
         # else:
@@ -225,6 +233,7 @@ class ParserRefal(object):
                 return pattern
             else:
                 sys.stderr.write("Expected \")\" after declaring pattern\n")
+                self.isError = True
             return []
         else:
             return self.parse_common()
@@ -275,6 +284,7 @@ class ParserRefal(object):
                 return result
             else:
                 sys.stderr.write("Expected \")\" after declaring result\n")
+                self.isError = True
             return []
         elif self.cur_token.tag == DomainTag.Left_bracket:
             func_name = self.cur_token.value[1:]
@@ -285,6 +295,7 @@ class ParserRefal(object):
                 self.cur_token = next(self.iteratorTokens)
             else:
                 sys.stderr.write("Expected \">\" after declaring result\n")
+                self.isError = True
             return [CallBrackets(func_name, pos, result)]
         else:
             return self.parse_common()

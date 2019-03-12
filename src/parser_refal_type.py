@@ -53,51 +53,58 @@ class ParserRefalType(object):
                 result = self.parse_format()
             else:
                 sys.stderr.write("Expected \"=\" after declaring name of function\n")
+                self.isError = True
             if not (self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ";"):
                 sys.stderr.write("Expected \";\" after function\n")
+                self.isError = True
             else:
                 self.cur_token = next(self.iteratorTokens)
                 return [DefinitionType(func_name, pattern, result, pos)]
+        return []
 
     # Format ::= Common ('e.Var' Common)?
     def parse_format(self):
         format_function = self.parse_common()
-        if self.cur_token.tag == DomainTag.Variable:
+        if self.cur_token.tag == DomainTag.Variable and self.cur_token.value[0] == "e":
+            format_function.append(Variable(self.cur_token.value, Type[self.cur_token.value[0]], self.cur_token.coords))
             self.cur_token = next(self.iteratorTokens)
             format_function.extend(self.parse_common())
         return Expression(format_function)
 
-    # Common ::= 'Name' | ''chars'' | '123' | 'e.Var' | ('(' Format ')')* | ε
+    # Common ::= ('Name' | ''chars'' | '123' | 's.Var' | 't.Var' | '(' Format ')')* | ε
     def parse_common(self):
-        if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "(":
-            self.cur_token = next(self.iteratorTokens)
-            result = [StructuralBrackets(self.parse_format().terms)]
-            if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ")":
+        common_term = []
+        while self.cur_token.tag == DomainTag.Ident or self.cur_token.tag == DomainTag.Number or \
+                self.cur_token.tag == DomainTag.Characters or self.cur_token.tag == DomainTag.Composite_symbol \
+                or (self.cur_token.tag == DomainTag.Variable and (self.cur_token.value[0] == "s" or self.cur_token.value[0] == "t")) \
+                or (self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "("):
+            if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "(":
                 self.cur_token = next(self.iteratorTokens)
-                return result
+                common_term.append(StructuralBrackets(self.parse_format().terms))
+                if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ")":
+                    self.cur_token = next(self.iteratorTokens)
+                else:
+                    sys.stderr.write("Expected \")\" after declaring pattern\n")
+                    self.isError = True
             else:
-                sys.stderr.write("Expected \")\" after declaring pattern\n")
-            return []
-        else:
-            if self.cur_token.tag == DomainTag.Ident:
-                token = self.cur_token
-                self.cur_token = next(self.iteratorTokens)
-                return [CompoundSymbol(token.value)]
-            elif self.cur_token.tag == DomainTag.Characters:
-                token = self.cur_token
-                self.cur_token = next(self.iteratorTokens)
-                return [Char(token.value)]
-            elif self.cur_token.tag == DomainTag.Number:
-                token = self.cur_token
-                self.cur_token = next(self.iteratorTokens)
-                return [Macrodigit(token.value)]
-            elif self.cur_token.tag == DomainTag.Composite_symbol:
-                token = self.cur_token
-                self.cur_token = next(self.iteratorTokens)
-                return [CompoundSymbol(token.value)]
-            elif self.cur_token.tag == DomainTag.Variable:
-                token = self.cur_token
-                self.cur_token = next(self.iteratorTokens)
-                return [Variable(token.value, Type[token.value[0]], token.coords)]
-            else:
-                return []
+                if self.cur_token.tag == DomainTag.Ident:
+                    token = self.cur_token
+                    self.cur_token = next(self.iteratorTokens)
+                    common_term.append(CompoundSymbol(token.value))
+                elif self.cur_token.tag == DomainTag.Characters:
+                    token = self.cur_token
+                    self.cur_token = next(self.iteratorTokens)
+                    common_term.append(Char(token.value))
+                elif self.cur_token.tag == DomainTag.Number:
+                    token = self.cur_token
+                    self.cur_token = next(self.iteratorTokens)
+                    common_term.append(Macrodigit(token.value))
+                elif self.cur_token.tag == DomainTag.Composite_symbol:
+                    token = self.cur_token
+                    self.cur_token = next(self.iteratorTokens)
+                    common_term.append(CompoundSymbol(token.value))
+                elif self.cur_token.tag == DomainTag.Variable:
+                    token = self.cur_token
+                    self.cur_token = next(self.iteratorTokens)
+                    common_term.append(Variable(token.value, Type[token.value[0]], token.coords))
+        return common_term

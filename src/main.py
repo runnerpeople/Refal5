@@ -12,7 +12,11 @@ import sys
 TEST_DIRECTORY = join(dirname(dirname(__file__)), 'test_refal').replace("\\", "/")
 DEBUG_MODE = False
 
-NAME_FILE = "test11"
+if len(sys.argv) == 1:
+    sys.stderr.write("usage: main.py <name_file>")
+    sys.exit(-1)
+
+NAME_FILE = sys.argv[1]
 
 REFAL_TYPE = ".ref"
 FILE_TYPE = ".type"
@@ -126,7 +130,8 @@ if parser_refal_type is None:
     refal_type_ast = parser_refal_built_in_type.ast
 else:
     refal_type_ast = parser_refal_type.ast
-    refal_type_ast.append(parser_refal_built_in_type.ast)
+    refal_type_ast.functions = [r for r in refal_type_ast.functions if isinstance(r, DefinitionType)]
+    refal_type_ast.functions.extend(parser_refal_built_in_type.ast.functions)
 
     # if DEBUG_MODE:
     #     print(parser_refal_type.ast)

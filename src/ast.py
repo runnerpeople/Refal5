@@ -7,9 +7,9 @@ from enum import Enum
 DEFAULT_FUNCTIONS = ["Mu", "Add", "Arg", "Br", "Card", "Chr", "Cp", "Dg", "Dgall", "Div", "Divmod",
                      "Explode", "First", "Get", "Implode", "Last", "Lenw", "Lower", "Mod", "Mul",
                      "Numb", "Open", "Ord", "Print", "Prout", "Put", "Putout", "Rp", "Step",
-                     "Sub", "Symb", "Time", "Type", "Upper", "Freeze", "Freezer", "Dn",
+                     "Sub", "Symb", "Time", "Type", "Upper", "Freeze", "Dn",
                      "Up", "Ev-met", "Residue", "System", "Exit", "Close", "ExistFile", "GetCurrentDirectory",
-                     "RemoveFile", "SizeOf", "GetPID"]
+                     "RemoveFile", "SizeOf", "GetPID", "GetPPID"]
 
 
 class AST(object):
@@ -31,7 +31,7 @@ class Function(ABC):
         self.pos = pos
 
     def __eq__(self, other):
-        return self.name == other.name
+        return isinstance(other, Function) and self.name == other.name
 
     @abstractmethod
     def __str__(self):
@@ -42,6 +42,9 @@ class Extern(Function):
 
     def __init__(self, name, pos=None):
         super(Extern, self).__init__(name, pos)
+
+    def __eq__(self, other):
+        return isinstance(other, Extern) and self.name == other.name
 
     def __str__(self):
         return "$EXTERN " + self.name
@@ -56,6 +59,9 @@ class Definition(Function):
         self.is_entry = is_entry
         self.sentences = sentences
 
+    def __eq__(self, other):
+        return isinstance(other, Definition) and self.name == other.name
+
     def __str__(self):
         return self.name + " {\n" + ";\n".join(list(map(str, self.sentences))) + ";\n}"
 
@@ -66,6 +72,9 @@ class DefinitionType(Function):
         super(DefinitionType, self).__init__(name, pos)
         self.pattern = pattern
         self.result = result
+
+    def __eq__(self, other):
+        return isinstance(other, DefinitionType) and self.name == other.name
 
     def __str__(self):
         return self.name + " " + str(self.pattern) + " = " + str(self.result)
@@ -108,7 +117,7 @@ class Expression(object):
         self.terms = terms
 
     def __eq__(self, other):
-        return self.terms == other.terms
+        return isinstance(other, Expression) and self.terms == other.terms
 
     def __hash__(self):
         return hash(self.__str__())
@@ -133,7 +142,7 @@ class Char(Term):
         super(Char, self).__init__(value)
 
     def __eq__(self, other):
-        return self.value == other.value
+        return isinstance(other, Char) and self.value == other.value
 
     def __str__(self):
         return super(Char, self).__str__()
@@ -145,7 +154,7 @@ class Macrodigit(Term):
         super(Macrodigit, self).__init__(value)
 
     def __eq__(self, other):
-        return self.value == other.value
+        return isinstance(other, Macrodigit) and self.value == other.value
 
     def __str__(self):
         return super(Macrodigit, self).__str__()
@@ -157,7 +166,7 @@ class CompoundSymbol(Term):
         super(CompoundSymbol, self).__init__(value)
 
     def __eq__(self, other):
-        return self.value == other.value
+        return isinstance(other, CompoundSymbol) and self.value == other.value
 
     def __str__(self):
         return super(CompoundSymbol, self).__str__()
@@ -167,6 +176,9 @@ class StructuralBrackets(Term):
 
     def __init__(self, value):
         super(StructuralBrackets, self).__init__(value)
+
+    def __eq__(self, other):
+        return isinstance(other, StructuralBrackets) and self.value == other.value
 
     def __str__(self):
         return "(" + " ".join(list(map(str, self.value))) + ")"
@@ -199,7 +211,7 @@ class Variable(Term):
         self.sentence_index = sentence_index
 
     def __eq__(self, other):
-        return self.type_variable == other.type_variable and self.index == other.index
+        return isinstance(other, Variable) and self.type_variable == other.type_variable and self.index == other.index
 
     def __str__(self):
         # return self.value

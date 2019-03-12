@@ -5,7 +5,7 @@ $ENTRY Go {
 
 ReadInput {
 	0 = ;
-	s.Char e.String = <CheckNumber <Mod <Numb s.Char e.String> 2> (s.Char e.String)> <ReadInput <Card>>; 
+	s.Char e.String = <CheckNumber <Mod <Numb s.Char e.String> 2> (s.Char e.String)> <ReadInput <Card>>;
 	e.String = <ReadInput <Card>>;
 }
 

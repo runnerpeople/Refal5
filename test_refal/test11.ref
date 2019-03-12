@@ -10,6 +10,13 @@ Trans {
    Fact { 0 = 1;
          s.N = <Mul s.N <Fact <Sub s.N 1>>>; }
 
+Table { = (('cane') 'dog')
+            (('gatto') 'cat')
+            (('cavallo') 'horse')
+            (('rana') 'frog')
+            (('porco') 'pig')
+         }
+
 Trans-line {
      ' ' e.X = <Trans-line e.X>;
      e.Word ' ' e.Rest =

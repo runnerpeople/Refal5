@@ -6,6 +6,7 @@ from src.ast import *
 from copy import deepcopy
 
 import math
+import sys
 
 DEBUG_MODE = False
 
@@ -75,7 +76,7 @@ class SpecialVariable(Term):
         self.sentence_index = sentence_index
 
     def __eq__(self, other):
-        return self.value == other.value and self.type_variable == other.type_variable
+        return isinstance(other, SpecialVariable) and self.value == other.value and self.type_variable == other.type_variable
 
     def __str__(self):
         if self.type_variable == SpecialType.in_function:
@@ -99,7 +100,7 @@ class Equation(object):
         self.type_equation = type_equation
 
     def __eq__(self, other):
-        return self.left_part == other.left_part and self.right_part == other.right_part and \
+        return isinstance(other, Equation) and self.left_part == other.left_part and self.right_part == other.right_part and \
                self.type_equation == other.type_equation
 
     def __str__(self):
@@ -113,7 +114,7 @@ class Substitution(object):
         self.right_part = right_part
 
     def __eq__(self, other):
-        return self.left_part == other.left_part and self.right_part == other.right_part
+        return isinstance(other, Substitution) and self.left_part == other.left_part and self.right_part == other.right_part
 
     def __str__(self):
         return str(self.left_part) + " -> " + str(self.right_part)
@@ -140,6 +141,10 @@ class Calculation(object):
         self.substitution = []
 
         self.system = self.create_equation()
+        # for eq in self.system:
+        #     print(eq)
+        #
+        # sys.exit(1)
 
         if len(self.system) == 0:
             while True:
@@ -200,7 +205,11 @@ class Calculation(object):
                     if not (len(eq.right_part.terms) >= 1 and isinstance(eq.right_part.terms[0], SpecialVariable) and
                             eq.right_part.terms[0].type_variable == SpecialType.none) and \
                             len(eq.right_part.terms) >= 0:
-                        _, substitution, self.system, eq = self.calculate_equation(eq, substitution, self.system)
+                        status, substitution, self.system, eq = self.calculate_equation(eq, substitution, self.system)
+
+                        if status == "Failure":
+                            sys.stderr.write("There isn't solution for equation - %s" % self.system[k])
+                            sys.exit(1)
                     else:
                         substitution = [Substitution(eq.left_part, eq.right_part)]
 
@@ -254,6 +263,7 @@ class Calculation(object):
 
                     if self.is_fixed_point(self.format_function, format_functions_result):
                         self.system.remove(self.system[k])
+                        # self.substitution = substitution_result
                         break
                     else:
                         self.format_function = format_functions_result
@@ -307,7 +317,7 @@ class Calculation(object):
     def print_term(self, term):
         if isinstance(term, StructuralBrackets):
             output = '('
-            output += ', '.join(list(map(self.print_term, term.value)))
+            output += ' '.join(list(map(self.print_term, term.value)))
             output += ')'
             return output
         if isinstance(term, Variable):
@@ -451,19 +461,37 @@ class Calculation(object):
 
     def apply_substitution(self, expr, subst):
         res = []
-        for term in expr.terms:
-            if isinstance(term, (Variable, SpecialVariable)):
+        i = 0
+        exprs = deepcopy(expr)
+        while i < len(exprs.terms):
+            j = i + 1
+            exists_substitution = False
+            while j <= len(exprs.terms):
+                sub_expr = Expression(exprs.terms[i:j])
+                for substitution in subst:
+                    if substitution.left_part == sub_expr:
+                        exists_substitution = True
+                        res.extend(self.apply_substitution(substitution.right_part, subst).terms)
+                        del exprs.terms[i:j]
+                        break
+                if exists_substitution:
+                    break
+                j += 1
+            if exists_substitution:
+                continue
+            if isinstance(exprs.terms[i], (Variable, SpecialVariable)):
                 exists_substitution = False
                 for substitution in subst:
-                    if substitution.left_part.terms[0] == term:
+                    if type(substitution.left_part.terms[0]) == type(exprs.terms[i]) and substitution.left_part.terms[0] == exprs.terms[i]:
                         exists_substitution = True
-                        res += self.apply_substitution(substitution.right_part, subst).terms
+                        res.extend(self.apply_substitution(substitution.right_part, subst).terms)
                 if not exists_substitution:
-                    res += [term]
-            elif isinstance(term, StructuralBrackets):
-                res += [StructuralBrackets(self.apply_substitution(Expression(term.value), subst).terms)]
+                    res.append(exprs.terms[i])
+            elif isinstance(exprs.terms[i], StructuralBrackets):
+                res.extend([StructuralBrackets(self.apply_substitution(Expression(exprs.terms[i].value), subst).terms)])
             else:
-                res += [term]
+                res.append(exprs.terms[i])
+            i += 1
         return Expression(res)
 
     def create_equation(self):
@@ -474,18 +502,31 @@ class Calculation(object):
                 for sentence in function.sentences:
                     for i in range(len(sentence.result.terms)):
                         if isinstance(sentence.result.terms[i], CallBrackets):
-                            equations.extend(
-                                self.refactor(sentence.result.terms[i].content, sentence.result.terms[i].value))
+                            equations_new, _1, _2 = self.refactor(sentence.result.terms[i].content, sentence.result.terms[i].value)
+                            equations.extend(equations_new)
                             sentence.result.terms[i] = SpecialVariable(sentence.result.terms[i].value,
                                                                        SpecialType.out_function)
                         elif isinstance(sentence.result.terms[i], StructuralBrackets):
-                            equations.extend(self.refactor(sentence.result.terms[i].value, None))
-                self.format_function.append(
-                    Substitution(Expression([SpecialVariable(function.name, SpecialType.in_function)]),
-                                 Expression([SpecialVariable("@", SpecialType.none)])))
-                self.format_function.append(
-                    Substitution(Expression([SpecialVariable(function.name, SpecialType.out_function)]),
-                                 Expression([SpecialVariable("@", SpecialType.none)])))
+                            equations_new, _1, _2 = self.refactor(sentence.result.terms[i].value, None)
+                            equations.extend(equations_new)
+                in_format = Expression([SpecialVariable(function.name, SpecialType.in_function)])
+                out_format = Expression([SpecialVariable(function.name, SpecialType.out_function)])
+
+                found_default_in_format = False
+                found_default_out_format = False
+                for definition_type_function in self.default_format_function:
+                    if definition_type_function.left_part == in_format:
+                        found_default_in_format = True
+                    if definition_type_function.right_part == out_format:
+                        found_default_out_format = True
+                if not found_default_in_format:
+                    self.format_function.append(
+                        Substitution(Expression([SpecialVariable(function.name, SpecialType.in_function)]),
+                                     Expression([SpecialVariable("@", SpecialType.none)])))
+                if not found_default_out_format:
+                    self.format_function.append(
+                        Substitution(Expression([SpecialVariable(function.name, SpecialType.out_function)]),
+                                     Expression([SpecialVariable("@", SpecialType.none)])))
                 all_equations.extend(equations)
         return all_equations
 
@@ -511,10 +552,10 @@ class Calculation(object):
                     substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
                     return "Success", substitution, system, eq
                 elif isinstance(term_left, StructuralBrackets) and isinstance(term_right, StructuralBrackets):
-                    eq.type = EqType.Expr
-                    eq.left_part.terms = Expression(term_left.value)
-                    eq.right_part.terms = Expression(term_right.value)
-                    return self.calculate_equation(equation, substitution, system)
+                    eq.type_equation = EqType.Expr
+                    eq.left_part.terms = Expression(term_left.value).terms
+                    eq.right_part.terms = Expression(term_right.value).terms
+                    return self.calculate_equation(eq, substitution, system)
                 elif isinstance(term_right, StructuralBrackets) and isinstance(term_left,
                                                                                Variable) and term_left.type_variable == Type.t:
                     substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
@@ -539,7 +580,7 @@ class Calculation(object):
                     if status == "Success":
                         substitution = subst
                         system = syst
-
+                        return self.calculate_equation(eq,substitution,system)
                     else:
                         return "Failure", substitution, system, eq
 
@@ -559,7 +600,7 @@ class Calculation(object):
                     if status == "Success":
                         substitution = subst
                         system = syst
-
+                        return self.calculate_equation(eq, substitution, system)
                     else:
                         return "Failure", substitution, system, eq
 
@@ -652,21 +693,24 @@ class Calculation(object):
 
     def refactor(self, terms, func_name):
         equations = []
-        left_part = []
-        for i in range(len(terms)):
-            term = [terms[i]]
-            for j in range(len(term)):
-                if isinstance(term[j], CallBrackets):
-                    equations.extend(self.refactor(term[j].content, term[j].value))
-                    term[j] = SpecialVariable(term[j].value, SpecialType.out_function)
-                elif isinstance(terms[j], StructuralBrackets):
-                    terms[j] = self.refactor(terms[j].value, func_name)
-                left_part.append(term[j])
+        i = 0
+        while i < len(terms):
+            if isinstance(terms[i], CallBrackets):
+                equations_new, _, flag = self.refactor(terms[i].content, terms[i].value)
+                terms[i] = SpecialVariable(terms[i].value, SpecialType.out_function)
+                equations.extend(equations_new)
+            elif isinstance(terms[i], StructuralBrackets):
+                equations_new, terms_new, flag = self.refactor(terms[i].value, None)
+                terms[i] = StructuralBrackets(terms_new)
+                if flag:
+                    equations.extend(equations_new)
+            i += 1
         if func_name is not None:
             in_variable = Expression([SpecialVariable(func_name, SpecialType.in_function)])
-            return [Equation(Expression(left_part), in_variable, EqType.Expr), *equations]
+            return [Equation(Expression(terms), in_variable, EqType.Expr), *equations], terms, True
         else:
-            return equations
+            return [], terms, False
+
 
     def generalization_term_rec(self, term_left, term_right):
         # if isinstance(term_left, SpecialVariable) and term_left.type_variable == SpecialType.none:
@@ -691,7 +735,7 @@ class Calculation(object):
         if isinstance(term_right, Variable) and term_right.type_variable == Type.t:
             return term_right
         if isinstance(term_left, StructuralBrackets) and isinstance(term_right, StructuralBrackets):
-            return self.generalization([Expression(term_left.value), Expression(term_right.value)])
+            return StructuralBrackets(self.generalization([Expression(term_left.value), Expression(term_right.value)]).terms)
         if isinstance(term_left, StructuralBrackets):
             index = generate_index()
             return Variable("generated%d".format(index), Type.t, None, index)
@@ -717,6 +761,10 @@ class Calculation(object):
                 if special_value:
                     patterns.remove(pattern)
                     return self.generalization(patterns)
+        elif len(patterns) == 1:
+            for term in patterns[0].terms:
+                if isinstance(term, SpecialVariable) and term.type_variable == SpecialType.none:
+                    return Expression([term])
 
         all_empty = all(len(pattern.terms) == 0 for pattern in patterns)
         any_empty = any(len(pattern.terms) == 0 for pattern in patterns)
@@ -755,5 +803,5 @@ class Calculation(object):
                     return Expression([*left_t, *self.generalization(patterns).terms])
                 else:
                     for pattern in patterns:
-                        pattern.terms.pop(0)
-                    return Expression([*self.generalization(patterns), *right_t])
+                        pattern.terms.pop()
+                    return Expression([*self.generalization(patterns).terms, *right_t])

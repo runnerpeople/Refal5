@@ -1,0 +1,5 @@
+Fab {
+  (e.Res) 'A' e.Tail = <Fab (e.Res 'B') e.Tail>;
+  (e.Res) s.X e.Tail = <Fab (e.Res s.X) e.Tail>;
+  (e.Res) = e.Res;
+}

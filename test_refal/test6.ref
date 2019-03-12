@@ -17,7 +17,7 @@ CountWords {
 
 CountWordsRec {
 	s.NumArg = /* пусто */;
-	s.NumArg e.File = 
+	s.NumArg e.File =
 		<Open 'r' 3 e.File>
 		<Prout '      ' <DoCountWordsFile (0) <Get 3>> e.File>
 		<Close 3>

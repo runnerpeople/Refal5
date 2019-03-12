@@ -1,0 +1,5 @@
+F {
+  A A A A e.X = <F A A e.X>;
+  A A e.Y = <F A e.Y>;
+  A = A;
+}

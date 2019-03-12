@@ -1,10 +1,3 @@
-$ENTRY Go { = <Job <Card>>  }
-
- Job  {
-     0 = ;
-     e.X = <Trans-line e.X>
-          <Job <Card>>; }
-
   Trans-line {
      ' ' e.X = <Trans-line e.X>;
      e.Word ' ' e.Rest =
@@ -23,6 +16,3 @@ $ENTRY Go { = <Job <Card>>  }
   Trans {
      (e.Word) e.1 ((e.Word) e.Trans) e.2 = e.Trans;
      (e.Word) e.1  =  '***';  }
-
-   Fact { 0 = 1;
-         s.N = <Mul s.N <Fact <Sub s.N 1>>>; }
