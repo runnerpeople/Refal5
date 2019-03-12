@@ -213,6 +213,8 @@ class Calculation(object):
                     else:
                         substitution = [Substitution(eq.left_part, eq.right_part)]
 
+                    substitution = [subst for subst in substitution if not eq.left_part == eq.right_part]
+
                     ast = deepcopy(self.ast)
 
                     for function in ast.functions:

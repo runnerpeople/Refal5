@@ -9,7 +9,8 @@ DEFAULT_FUNCTIONS = ["Mu", "Add", "Arg", "Br", "Card", "Chr", "Cp", "Dg", "Dgall
                      "Numb", "Open", "Ord", "Print", "Prout", "Put", "Putout", "Rp", "Step",
                      "Sub", "Symb", "Time", "Type", "Upper", "Freeze", "Dn",
                      "Up", "Ev-met", "Residue", "System", "Exit", "Close", "ExistFile", "GetCurrentDirectory",
-                     "RemoveFile", "SizeOf", "GetPID", "GetPPID"]
+                     "RemoveFile", "SizeOf", "GetPID", "GetPPID",
+                     "Implode_Ext", "Explode_Ext", "TimeElapsed", "Compare", "Random", "RandomDigit", "Write", "ListOfBuiltin"]
 
 
 class AST(object):
