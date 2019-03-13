@@ -1,0 +1,8 @@
+$ENTRY refal05c_WriteError {
+  e.FileName (t.SrcPos e.Message) =
+    <Prout e.FileName ':' <StrFromSrcPos t.SrcPos> ':ERROR: ' e.Message>;
+}
+
+StrFromSrcPos {
+  (s.Line s.Col) = <Symb s.Line> ':' <Symb s.Col>;
+}

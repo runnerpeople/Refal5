@@ -1,0 +1,3 @@
+SaveFile (e.FileName) e.Lines = ;
+MapAccum t.Func t.Acc e.Terms = t.Acc e.Res;
+Map t.Func e.Terms = e.Res;

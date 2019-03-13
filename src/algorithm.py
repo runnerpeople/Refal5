@@ -213,7 +213,7 @@ class Calculation(object):
                     else:
                         substitution = [Substitution(eq.left_part, eq.right_part)]
 
-                    substitution = [subst for subst in substitution if not eq.left_part == eq.right_part]
+                    substitution = [subst for subst in substitution if not subst.left_part == subst.right_part]
 
                     ast = deepcopy(self.ast)
 
@@ -221,9 +221,9 @@ class Calculation(object):
                         if isinstance(function, Definition):
                             for sentence in function.sentences:
                                 sentence.pattern = self.apply_substitution(sentence.pattern,
-                                                                           [*substitution, *self.format_function])
+                                                                           [*substitution, *self.format_function, *self.default_format_function])
                                 sentence.result = self.apply_substitution(sentence.result,
-                                                                          [*substitution, *self.format_function])
+                                                                          [*substitution, *self.format_function, *self.default_format_function])
                     format_substitution_function = []
                     for function in ast.functions:
                         if isinstance(function, Definition):
@@ -265,7 +265,6 @@ class Calculation(object):
 
                     if self.is_fixed_point(self.format_function, format_functions_result):
                         self.system.remove(self.system[k])
-                        # self.substitution = substitution_result
                         break
                     else:
                         self.format_function = format_functions_result
@@ -354,7 +353,7 @@ class Calculation(object):
                         before_common_format_brackets = [
                             Substitution(key_group, Expression(common_format[key_group][0].terms[i].value))]
                         after_common_format_brackets = [
-                            Substitution(key_group, Expression(common_format[key_group][0].terms[i].value))]
+                            Substitution(key_group, Expression(common_format[key_group][1].terms[i].value))]
 
                         if not self.is_fixed_point(before_common_format_brackets, after_common_format_brackets):
                             return False
@@ -560,7 +559,8 @@ class Calculation(object):
                     return self.calculate_equation(eq, substitution, system)
                 elif isinstance(term_right, StructuralBrackets) and isinstance(term_left,
                                                                                Variable) and term_left.type_variable == Type.t:
-                    substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
+                    if term_left.index != -1:
+                        substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
                     return "Success", substitution, system, eq
                 else:
                     return "Failure", [], system, eq
@@ -715,10 +715,10 @@ class Calculation(object):
 
 
     def generalization_term_rec(self, term_left, term_right):
-        # if isinstance(term_left, SpecialVariable) and term_left.type_variable == SpecialType.none:
-        #     return term_left
-        # if isinstance(term_right, SpecialVariable) and term_right.type_variable == SpecialType.none:
-        #     return term_right
+        if isinstance(term_left, SpecialVariable) and term_left.type_variable == SpecialType.none:
+            return term_left
+        if isinstance(term_right, SpecialVariable) and term_right.type_variable == SpecialType.none:
+            return term_right
         if is_symbol(term_left) and is_symbol(term_right):
             if term_left == term_right:
                 return term_left
@@ -737,7 +737,11 @@ class Calculation(object):
         if isinstance(term_right, Variable) and term_right.type_variable == Type.t:
             return term_right
         if isinstance(term_left, StructuralBrackets) and isinstance(term_right, StructuralBrackets):
-            return StructuralBrackets(self.generalization([Expression(term_left.value), Expression(term_right.value)]).terms)
+            result_terms = self.generalization([Expression(term_left.value), Expression(term_right.value)]).terms
+            if result_terms == [SpecialVariable("@",SpecialType.none)]:
+                return SpecialVariable("@",SpecialType.none)
+            else:
+                return StructuralBrackets(result_terms)
         if isinstance(term_left, StructuralBrackets):
             index = generate_index()
             return Variable("generated%d".format(index), Type.t, None, index)
@@ -746,13 +750,16 @@ class Calculation(object):
             return Variable("generated%d".format(index), Type.s, None, index)
 
     def generalization_term(self, terms):
-        while len(terms) > 1:
-            term = self.generalization_term_rec(terms.pop(), terms.pop())
-            if isinstance(term, Expression):
-                terms.extend(term.terms)
-            else:
-                terms.append(term)
-        return terms[0]
+        terms_copy = deepcopy(terms)
+        if len(terms_copy) > 1:
+            while len(terms_copy) > 1:
+                term = self.generalization_term_rec(terms_copy.pop(), terms_copy.pop())
+                terms_copy.append(term)
+            return terms_copy[0]
+        else:
+            term = terms_copy.pop()
+            result_term = self.generalization_term_rec(term, deepcopy(term))
+            return result_term
 
     def generalization(self, patterns):
         if len(patterns) > 1:

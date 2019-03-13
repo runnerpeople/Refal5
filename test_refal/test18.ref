@@ -1,0 +1,34 @@
+*$FROM LibraryEx
+$EXTERN MapAccum;
+
+
+$ENTRY generator_GenSentence {
+  ((e.Pattern) (e.Result)) =
+    ()
+    ('  do {')
+    <SkipIndentAccum
+      <MapAccum
+        generator_GenCommand
+        ('    ' /* отступ */)
+        <CompileSentence (e.Pattern) (e.Result)>
+      >
+    >
+    ('  } while (0);');
+
+  ReturnRecognitionImpossible =
+    ()
+    ('  r05_recognition_impossible();');
+}
+
+SkipIndentAccum {
+  /* отступ должен остаться тем же */
+  ('    ') e.Generated = e.Generated;
+}
+
+*===============================================================================
+* Генерация абстрактного кода для предложения
+*===============================================================================
+
+CompileSentence {
+  (e.Pattern) (e.Result) = e.Pattern e.Result;
+}

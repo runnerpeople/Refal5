@@ -1,0 +1,6 @@
+ArgList = (e.ProgName) e.Args;
+LoadFile e.FileName = e.Lines;
+Map t.Func e.Items = e.ResItems;
+R05-FindFiles-Default e.Files = e.Files;
+R05-Parse-File e.FileName = s.Result e.Data;
+R05-Generate-ToFile (e.File) e.Tree = ;

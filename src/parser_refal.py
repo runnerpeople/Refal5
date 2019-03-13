@@ -32,6 +32,39 @@ class ParserRefal(object):
         else:
             return []
 
+    def check_call(self, term, ast_type):
+        for term_content in term.content:
+            if isinstance(term_content, CallBrackets):
+                self.check_call(term_content, ast_type)
+
+        has_body = False
+        has_definition_type = False
+
+        for function_new in self.ast.functions:
+            if isinstance(function_new, Definition):
+                if term.value == function_new.name:
+                    has_body = True
+                    break
+
+        if not has_body:
+            for function_definition_type in ast_type.functions:
+                if isinstance(function_definition_type, DefinitionType):
+                    if term.value == function_definition_type.name:
+                        has_definition_type = True
+
+        if not has_definition_type and not has_body:
+            sys.stderr.write("Error. Unknown function %s\n" % (term.value))
+            self.isError = True
+
+    def semantics_call(self, ast_type):
+        if not self.isError:
+            for function in self.ast.functions:
+                if isinstance(function, Definition):
+                    for sentence in function.sentences:
+                        for term in sentence.result.terms:
+                            if isinstance(term, CallBrackets):
+                                self.check_call(term, ast_type)
+
     def semantics_variable(self, sentences):
         for sentence in sentences:
             variables = []
@@ -45,8 +78,7 @@ class ParserRefal(object):
                     for variable in out_variables:
                         if variable not in variables:
                             sys.stderr.write(
-                                "Error. Variable %s[%s] isn't found in previous sentence" % (variable.value,
-                                                                                             variable.pos))
+                                "Error. Variable %s isn't found in previous sentence" % (variable))
                             self.isError = True
             if sentence.block:
                 self.semantics_variable(sentence.block)
@@ -54,8 +86,7 @@ class ParserRefal(object):
                 out_variables = self.get_variables(term)
                 for variable in out_variables:
                     if variable not in variables:
-                        sys.stderr.write("Error. Variable %s[%s] isn't found in previous sentence" % (variable.value,
-                                                                                                      variable.pos))
+                        sys.stderr.write("Error. Variable %s isn't found in previous sentence\n" % (variable))
                         self.isError = True
 
     def semantics(self):
@@ -74,7 +105,7 @@ class ParserRefal(object):
                         for term in sentence.result.terms:
                             if isinstance(term, CallBrackets):
                                 if term.value not in names:
-                                    sys.stderr.write("Error. Function %s isn't defined" % term.value)
+                                    sys.stderr.write("Error. Function %s isn't defined\n" % term.value)
                                     self.isError = True
         if not self.isError:
             for function in self.ast.functions:

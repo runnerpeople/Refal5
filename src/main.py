@@ -133,6 +133,8 @@ else:
     refal_type_ast.functions = [r for r in refal_type_ast.functions if isinstance(r, DefinitionType)]
     refal_type_ast.functions.extend(parser_refal_built_in_type.ast.functions)
 
+parser_refal.semantics_call(refal_type_ast)
+
     # if DEBUG_MODE:
     #     print(parser_refal_type.ast)
 
