@@ -1,0 +1,901 @@
+*$FROM R05-AST
+$EXTERN Extern, Entry, Function, Native, Local, Sentences, Variable, Symbol,
+  Brackets, Char, Number, Name, TextFromExpr, CallBrackets;
+
+*$FROM LibraryEx
+$EXTERN SaveFile, MapAccum, Map, Dec, DelAccumulator, Inc;
+
+
+/**
+  <R05-Generate-ToFile (e.OutputFile) e.Tree> == пусто
+*/
+$ENTRY R05-Generate-ToFile {
+  (e.OutputFile) e.Tree =
+    <SaveFile (e.OutputFile) <Generate (e.OutputFile) e.Tree>>;
+}
+
+/**
+  <R05-Generate-ToLines e.Tree> == (s.CHAR*)*
+*/
+$ENTRY R05-Generate-ToLines {
+  e.Tree = <Generate ('<user output>') e.Tree>;
+}
+
+Generate {
+  (e.OutputFile) e.Tree =
+    <R05-Generate-Aux
+      (e.OutputFile)
+      <MapAccum generator_GenTreeItem (/* declarations */) e.Tree>
+    >;
+}
+
+R05-Generate-Aux {
+  (e.OutputFile) (e.Declarations) e.Definitions =
+    <GenPostprocess
+      (e.OutputFile)
+      ('/* Automatically generated file. Don\'t edit! */')
+      ('#include "refal05rts.h"')
+      ()
+      ()
+      e.Declarations
+      ()
+      e.Definitions
+      ()
+      ('/* End of file */')
+    >;
+}
+
+$ENTRY generator_GenTreeItem {
+  (e.Declarations) (Extern e.Name) =
+    (e.Declarations <GenDeclaration Entry e.Name>)
+    /* пусто */;
+
+  (e.Declarations) (Function s.ScopeClass (e.Name) e.Body) =
+    (e.Declarations <GenDeclaration s.ScopeClass e.Name>)
+    <GenFunction s.ScopeClass (e.Name) e.Body>;
+
+  (e.Declarations) (Native e.Native) =
+    (e.Declarations) <GenNative e.Native>;
+}
+
+
+TextFromScopeClass {
+  Local = 'static '; Entry = ;
+}
+
+GenDeclaration {
+  Entry e.Name = ('extern struct r05_function r05f_' e.Name ';');
+  Local e.Name = ('static struct r05_function r05f_' e.Name ';');
+}
+
+GenFunction {
+  s.ScopeClass (e.Name) Sentences /* пусто */ =
+    (
+      <TextFromScopeClass s.ScopeClass>
+      'struct r05_function r05f_' e.Name ' = '
+      '{ r05_enum_function_code, "' e.Name '" };'
+    )
+    ();
+
+  s.ScopeClass (e.Name) e.Body =
+    (
+      'static void r05c_' e.Name
+      '(struct r05_node *arg_begin, struct r05_node *arg_end) {'
+    )
+    <GenFunctionBody e.Body>
+    ('}')
+    (
+      <TextFromScopeClass s.ScopeClass>
+      'struct r05_function r05f_' e.Name ' = { r05c_' e.Name ', "' e.Name '" };'
+    )
+    ();
+}
+
+GenFunctionBody {
+  Sentences e.Sentences =
+    ('  r05_this_is_generated_function();')
+    <Map generator_GenSentence <AddFailCommand e.Sentences>>;
+
+  Native e.Native = <GenNative e.Native>;
+}
+
+*$ENUM ReturnRecognitionImpossible
+
+AddFailCommand {
+  /*
+    если последнее предложение имеет вид
+    e.X = ...;, в конце не генерится вызов
+    r05_recognition_impossible()
+  */
+  e.Sentences (((Variable 'e' e.Index)) (e.Result)) =
+    e.Sentences (((Variable 'e' e.Index)) (e.Result));
+
+  e.Sentences = e.Sentences ReturnRecognitionImpossible;
+}
+
+$ENTRY generator_GenSentence {
+  ((e.Pattern) (e.Result)) =
+    ()
+    ('  do {')
+    <SkipIndentAccum
+      <MapAccum
+        generator_GenCommand
+        ('    ' /* отступ */)
+        <CompileSentence (e.Pattern) (e.Result)>
+      >
+    >
+    ('  } while (0);');
+
+  ReturnRecognitionImpossible =
+    ()
+    ('  r05_recognition_impossible();');
+}
+
+SkipIndentAccum {
+  /* отступ должен остаться тем же */
+  ('    ') e.Generated = e.Generated;
+}
+
+RangeVar-B { s.BracketNumber = 'bb[' <Symb s.BracketNumber> ']' }
+RangeVar-E { s.BracketNumber = 'be[' <Symb s.BracketNumber> ']' }
+
+RangeVars {
+  s.BracketNumber =
+    <RangeVar-B s.BracketNumber> ', ' <RangeVar-E s.BracketNumber>;
+}
+
+RangeVarsPtr {
+  s.BracketNumber = 'bb+' <Symb s.BracketNumber> ', be+' <Symb s.BracketNumber>;
+}
+
+SafeComment {
+  e.Comment-B '/*' e.Comment-E =
+    <SafeComment e.Comment-B '/\' \'*' e.Comment-E>;
+
+  e.Comment-B '*/' e.Comment-E =
+    <SafeComment e.Comment-B '*\' \'/' e.Comment-E>;
+
+  e.Comment = e.Comment;
+}
+
+$ENTRY generator_GenCommand {
+  (e.Indent)
+  (CmdOpenedE-Start s.BracketNumber 'e' e.Index) =
+    (e.Indent '  ')
+    <CmdOpenedE-Start (e.Indent) s.BracketNumber 'e' e.Index>;
+
+  (e.Indent '  ')
+  (CmdOpenedE-End s.BracketNumber 'e' e.Index) =
+    (e.Indent)
+    <CmdOpenedE-End (e.Indent) s.BracketNumber 'e' e.Index>;
+
+  (e.Indent) (s.Command e.Args) =
+    (e.Indent) <Mu s.Command (e.Indent) e.Args>;
+}
+
+CmdComment {
+  (e.Indent) e.Text = (e.Indent '/* ' <SafeComment e.Text> ' */');
+}
+
+CmdDeclareVar {
+  (e.Indent) s.Usings 'e' e.Index =
+    (e.Indent 'struct r05_node *' <EVar-B s.Usings 'e' e.Index> ';')
+    (e.Indent 'struct r05_node *' <EVar-E s.Usings 'e' e.Index> ';');
+
+  (e.Indent) s.Usings s.Mode e.Index =
+    (e.Indent 'struct r05_node *' <Var s.Usings s.Mode e.Index> ';');
+}
+
+CmdRangeArray {
+  (e.Indent) s.Size =
+    (e.Indent 'struct r05_node *bb[' <Symb s.Size> '] = { 0 };')
+    (e.Indent 'struct r05_node *be[' <Symb s.Size> '] = { 0 };');
+}
+
+CmdInitB0 {
+  (e.Indent) =
+    (e.Indent 'r05_prepare_argument(' <RangeVarsPtr 0> ', arg_begin, arg_end);');
+}
+
+CmdMatch {
+  (e.Indent) s.Direction s.BracketNumber s.Type e.Value =
+    (e.Indent
+      'if (! r05_' <MatchFunc s.Type e.Value> '_' <StrFromDirection s.Direction>
+      '(' <MatchArgs s.Type e.Value> ', ' <RangeVarsPtr s.BracketNumber> '))'
+    )
+    (e.Indent '  continue;');
+}
+
+MatchFunc {
+  Symbol s.Type e.Value = <SymbolFunc s.Type>;
+  Brackets s.InnerNum = 'brackets';
+  Repeated s.Usings 'e' e.Index = 'repeated_evar';
+  Repeated s.Usings s.Mode e.Index = 'repeated_stvar';
+  Variable 's' e.Index = 'svar';
+  Variable 't' e.Index = 'tvar';
+}
+
+SymbolFunc {
+  Char = 'char';
+  Number = 'number';
+  Name = 'function';
+}
+
+StrFromDirection {
+  AlgLeft = 'left'; AlgRight = 'right';
+}
+
+MatchArgs {
+  Symbol s.Type e.Value = <SymbolTextRep s.Type e.Value>;
+
+  Brackets s.InnerNum = <RangeVarsPtr s.InnerNum>;
+
+  Repeated s.Usings s.Mode e.Index =
+    <VarPtr s.Usings s.Mode e.Index> ', ' <Var <Dec s.Usings> s.Mode e.Index>;
+
+  Variable s.Mode e.Index = <VarPtr 1 s.Mode e.Index>;
+}
+
+SymbolTextRep {
+  Char s.Char = '\'' <EscapeChar s.Char> '\'';
+  Number s.Number = <Symb s.Number> 'UL';
+  Name t.SrcPos e.Name = '&r05f_' e.Name;
+}
+
+CmdEmpty {
+  (e.Indent) s.BracketNumber =
+    (e.Indent 'if (! r05_empty_seq(' <RangeVars s.BracketNumber> '))')
+    (e.Indent '  continue;');
+}
+
+CmdClosedE {
+  (e.Indent) s.BracketNumber 'e' e.Index =
+    (e.Indent <EVar-B 1 'e' e.Index> ' = ' <RangeVar-B s.BracketNumber> ';')
+    (e.Indent <EVar-E 1 'e' e.Index> ' = ' <RangeVar-E s.BracketNumber> ';');
+}
+
+CmdOpenedE-Start {
+  (e.Indent) s.BracketNumber 'e' e.Index =
+    (e.Indent <EVar-B 1 'e' e.Index> ' = 0;')
+    (e.Indent <EVar-E 1 'e' e.Index> ' = 0;')
+    (e.Indent 'r05_start_e_loop();')
+    (e.Indent 'do {');
+}
+
+CmdOpenedE-End {
+  (e.Indent) s.BracketNumber 'e' e.Index =
+    (e.Indent
+      '} while (r05_open_evar_advance('
+      <VarPtr 1 'e' e.Index> ', ' <RangeVarsPtr s.BracketNumber>
+      '));'
+    )
+    (e.Indent 'r05_stop_e_loop();');
+}
+
+CmdSave {
+  (e.Indent) s.Old s.New =
+    (e.Indent <RangeVar-B s.New> ' = ' <RangeVar-B s.Old> ';')
+    (e.Indent <RangeVar-E s.New> ' = ' <RangeVar-E s.Old> ';');
+}
+
+CmdEmptyResult {
+  (e.Indent) = () (e.Indent 'r05_reset_allocator();');
+}
+
+CmdResultArray {
+  (e.Indent) s.Size =
+    (e.Indent 'struct r05_node *n[' <Symb s.Size> '] = { 0 };');
+}
+
+CmdAllocateElem {
+  (e.Indent) s.ElementType e.Info =
+    (e.Indent 'r05_alloc_' <Mu s.ElementType e.Info>);
+}
+
+ElSymbol {
+  s.Type e.Value = <SymbolFunc s.Type> '(' <SymbolTextRep s.Type e.Value> ');';
+}
+
+ElString {
+  s.Len e.String = 'chars("' <EscapeString e.String> '", ' <Symb s.Len> ');';
+}
+
+ElOpenBracket { s.Pos = 'open_bracket(' <ElemPtr s.Pos> ');' }
+ElCloseBracket { s.Pos = 'close_bracket(' <ElemPtr s.Pos> ');' }
+ElOpenCall { s.Pos = 'open_call(' <ElemPtr s.Pos> ');' }
+ElCloseCall { s.Pos = 'close_call(' <ElemPtr s.Pos> ');' }
+
+ElSavePos { s.Pos = 'insert_pos(' <ElemPtr s.Pos> ');' }
+
+ElVariable { s.Mode e.Index = s.Mode 'var(' <Var 1 s.Mode e.Index> ');' }
+
+CmdLinkBrackets {
+  (e.Indent) s.Left s.Right =
+    (e.Indent 'r05_link_brackets(' <Elem s.Left> ', ' <Elem s.Right> ');');
+}
+
+CmdPushStack {
+  (e.Indent) s.ElemNumber =
+    (e.Indent 'r05_push_stack(' <Elem s.ElemNumber> ');');
+}
+
+CmdInsertVar {
+  (e.Indent) s.Pos s.Usings s.Mode e.Index =
+    (e.Indent
+      'r05_splice_' s.Mode 'var'
+      '(' <Elem s.Pos> ', ' <Var s.Usings s.Mode e.Index> ');'
+    );
+}
+
+CmdReturnResult {
+  (e.Indent) =
+    (e.Indent 'r05_splice_from_freelist(arg_begin);')
+    (e.Indent 'r05_splice_to_freelist(arg_begin, arg_end);')
+    (e.Indent 'return;');
+}
+
+EscapeString {
+  e.String = <Map EscapeChar e.String>;
+}
+
+EscapeChar {
+  '\n' = '\\n';
+  '\t' = '\\t';
+  '\r' = '\\r';
+  '\'' = '\\\'';
+  '\"' = '\\\"';
+  '\\' = '\\\\';
+
+  s.Other = <EscapeChar-Aux s.Other <Ord s.Other>>;
+}
+
+EscapeChar-Aux {
+  s.Other s.Code =
+    <EscapeChar-SwCompare
+      s.Other <Compare 31 s.Code> <Compare s.Code 128> s.Code
+    >;
+}
+
+EscapeChar-SwCompare {
+  s.Other '-' '-' s.Code = s.Other;
+
+  s.Other s.Compare1 s.Compare2 s.Code =
+    '\\'
+    <Symb <Div s.Code 64>>
+    <Symb <Mod <Div s.Code 8> 8>>
+    <Symb <Mod s.Code 8>>;
+}
+
+Var {
+  s.Usings 'e' e.Index =
+    <EVar-B s.Usings 'e' e.Index> ', ' <EVar-E s.Usings 'e' e.Index>;
+
+  s.Usings s.Mode e.Index = s.Mode e.Index '_' <Symb s.Usings>;
+}
+
+VarPtr {
+  s.Usings 'e' e.Index =
+    '&' <EVar-B s.Usings 'e' e.Index> ', &' <EVar-E s.Usings 'e' e.Index>;
+
+  s.Usings s.Mode e.Index = '&' s.Mode e.Index '_' <Symb s.Usings>;
+}
+
+EVar-B { s.Usings 'e' e.Index = 'e' e.Index '_b_' <Symb s.Usings> }
+EVar-E { s.Usings 'e' e.Index = 'e' e.Index '_e_' <Symb s.Usings> }
+
+Elem { s.Number = 'n[' <Symb s.Number> ']' }
+ElemPtr { s.Number = 'n+' <Symb s.Number> }
+
+*$ENUM BeginNative, EndNative
+
+GenNative {
+  (e.SrcName s.Line) e.Code = (BeginNative e.SrcName s.Line) e.Code (EndNative);
+}
+
+GenPostprocess {
+  (e.OutputName) e.Lines-B (EndNative) e.Lines-E =
+    <DelAccumulator
+      <MapAccum
+        (generator_EnumerateLines (e.OutputName))
+        1
+        e.Lines-B (EndNative) e.Lines-E
+      >
+    >;
+
+  (e.OutputName) e.Lines = e.Lines;
+}
+
+$ENTRY generator_EnumerateLines {
+  (e.OutputName) s.LineNo (BeginNative e.SrcName s.NativeLineNo) =
+    <Inc s.LineNo>
+    <LineDirective s.NativeLineNo e.SrcName>;
+
+  (e.OutputName) s.LineNo (EndNative) =
+    <Inc s.LineNo>
+    <LineDirective s.LineNo e.OutputName>;
+
+  (e.OutputName) s.LineNo (e.Line) = <Inc s.LineNo> (e.Line);
+}
+
+LineDirective {
+  s.LineNo e.FileName =
+    ('#line ' <Symb <Inc s.LineNo>> ' "' <EscapeString e.FileName> '"');
+}
+
+
+*===============================================================================
+* Генерация абстрактного кода для предложения
+*===============================================================================
+
+CompileSentence {
+  (e.Pattern) (e.Result) =
+    <CompileSentence-Aux <GenPattern e.Pattern> e.Result>;
+}
+
+CompileSentence-Aux {
+  s.NumRanges (e.PatternVars) (e.PatternCommands) e.Result =
+    <ComposeSentenceCommands
+      s.NumRanges (e.PatternVars) (e.PatternCommands)
+      <GenResult (e.PatternVars) e.Result>
+    >;
+}
+
+/*
+  e.Vars ::= (s.Count s.Mode e.Index)*
+*/
+
+*===============================================================================
+* Генерация образца
+*===============================================================================
+
+* Направление распознавания
+*$ENUM AlgLeft, AlgRight
+
+/*
+Команды распознавания
+  Символы, скобки, повторные переменные и s-, t-переменные:
+    (CmdMatch s.Direction s.BracketNum s.MatchType e.MatchValue)
+
+    s.Direction ::= AlgLeft | AlgRight
+
+    s.MatchType e.MatchValue ::=
+        Symbol Char s.Char
+      | Symbol Number s.Number
+      | Symbol Name t.SrcPos e.Name
+      | Brackets s.InnerNum
+      | Repeated s.Usings s.Mode e.Index
+      | Variable s.Mode e.Index
+
+  Пустые скобки:
+    (CmdEmpty s.BracketNum),
+
+  Открытые e-переменные до обработки:
+    (CmdOpenedE s.BracketNum 'e' e.Index)
+
+  Открытые e-переменные после обработки:
+    (CmdOpenedE-Start s.BracketNum 'e' e.Index)
+    (CmdOpenedE-End s.BracketNum 'e' e.Index)
+
+  Закрытые e-переменные:
+    (CmdClosedE s.BracketNum 'e' e.Index)
+
+  Команды сохранения скобок:
+    (CmdSave s.OldNumber e.NewNumber)
+
+  Комментарий, вносимый в исходный код:
+    (CmdComment e.Text)
+*/
+*$ENUM Repeated
+
+*$ENUM CmdOpenedE
+
+GenPattern {
+  e.Pattern =
+    <DoGenPattern
+      1 (0 e.Pattern) (/* vars */)
+      (
+        (CmdComment <TextFromExpr e.Pattern>)
+        /* commands */
+      )
+    >;
+}
+
+DoGenPattern {
+  /* Распознавание литералов (символьных, целочисленных, имён) */
+  s.NumRanges e.Ranges-B (s.Num (Symbol s.Type e.Value) e.Range) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B (s.Num e.Range) e.Ranges-E
+      (e.Vars) (e.Commands (CmdMatch AlgLeft s.Num Symbol s.Type e.Value))
+    >;
+
+  s.NumRanges e.Ranges-B (s.Num e.Range (Symbol s.Type e.Value)) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B (s.Num e.Range) e.Ranges-E
+      (e.Vars) (e.Commands (CmdMatch AlgRight s.Num Symbol s.Type e.Value))
+    >;
+
+  /* Распознавание скобок */
+  s.NumRanges e.Ranges-B
+  (s.Num (Brackets e.SubRange) e.Range)
+  e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      <Inc s.NumRanges>
+      e.Ranges-B (s.NumRanges e.SubRange) (s.Num e.Range) e.Ranges-E
+      (e.Vars) (e.Commands (CmdMatch AlgLeft s.Num Brackets s.NumRanges))
+    >;
+
+  s.NumRanges e.Ranges-B
+  (s.Num e.Range (Brackets e.SubRange))
+  e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      <Inc s.NumRanges>
+      e.Ranges-B (s.Num e.Range) (s.NumRanges e.SubRange) e.Ranges-E
+      (e.Vars) (e.Commands (CmdMatch AlgRight s.Num Brackets s.NumRanges))
+    >;
+
+  /* Пустой диапазон */
+  s.NumRanges e.Ranges-B (s.Num /* пусто */) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B e.Ranges-E
+      (e.Vars) (e.Commands (CmdEmpty s.Num))
+    >;
+
+  /* Распознавание переменных */
+  s.NumRanges e.Ranges-B (s.Num (Variable s.Mode e.Index) e.Range) e.Ranges-E
+  (e.Vars-B (s.Count s.Mode e.Index) e.Vars-E) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B (s.Num e.Range) e.Ranges-E
+      (e.Vars-B (<Inc s.Count> s.Mode e.Index) e.Vars-E)
+      (e.Commands (CmdMatch AlgLeft s.Num Repeated <Inc s.Count> s.Mode e.Index))
+    >;
+
+  s.NumRanges e.Ranges-B (s.Num e.Range (Variable s.Mode e.Index)) e.Ranges-E
+  (e.Vars-B (s.Count s.Mode e.Index) e.Vars-E) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B (s.Num e.Range) e.Ranges-E
+      (e.Vars-B (<Inc s.Count> s.Mode e.Index) e.Vars-E)
+      (e.Commands (CmdMatch AlgRight s.Num Repeated <Inc s.Count> s.Mode e.Index))
+    >;
+
+  /* Диапазон с закрытой переменной */
+  s.NumRanges e.Ranges-B (s.Num (Variable 'e' e.Index)) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B e.Ranges-E
+      (e.Vars (1 'e' e.Index))
+      (e.Commands (CmdClosedE s.Num 'e' e.Index))
+    >;
+
+  s.NumRanges e.Ranges-B (s.Num (Variable 's' e.Index) e.Range) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B (s.Num e.Range) e.Ranges-E
+      (e.Vars (1 's' e.Index))
+      (e.Commands (CmdMatch AlgLeft s.Num Variable 's' e.Index))
+    >;
+
+  s.NumRanges e.Ranges-B (s.Num (Variable 't' e.Index) e.Range) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B (s.Num e.Range) e.Ranges-E
+      (e.Vars (1 't' e.Index))
+      (e.Commands (CmdMatch AlgLeft s.Num Variable 't' e.Index))
+    >;
+
+  s.NumRanges e.Ranges-B (s.Num e.Range (Variable 's' e.Index)) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B (s.Num e.Range) e.Ranges-E
+      (e.Vars (1 's' e.Index))
+      (e.Commands (CmdMatch AlgRight s.Num Variable 's' e.Index))
+    >;
+
+  s.NumRanges e.Ranges-B (s.Num e.Range (Variable 't' e.Index)) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      s.NumRanges e.Ranges-B (s.Num e.Range) e.Ranges-E
+      (e.Vars (1 't' e.Index))
+      (e.Commands (CmdMatch AlgRight s.Num Variable 't' e.Index))
+    >;
+
+  s.NumRanges e.Ranges-B (s.Num (Variable 'e' e.Index) e.Range) e.Ranges-E
+  (e.Vars) (e.Commands) =
+    <DoGenPattern
+      <SaveRanges
+        s.NumRanges (/* scanned */) e.Ranges-B (s.Num e.Range) e.Ranges-E
+        (e.Vars (1 'e' e.Index))
+        (e.Commands (CmdOpenedE s.Num 'e' e.Index))
+      >
+    >;
+
+  /* Завершение разбора. */
+  s.NumRanges /* пусто */ (e.Vars) (e.Commands) =
+    s.NumRanges (e.Vars) (e.Commands);
+}
+
+SaveRanges {
+  s.NumRanges (e.ScannedRanges) (s.Num e.Range) e.Ranges
+  (e.Vars) (e.Commands) =
+    <SaveRanges
+      <Inc s.NumRanges> (e.ScannedRanges (s.NumRanges e.Range)) e.Ranges
+      (e.Vars) (e.Commands (CmdSave s.Num s.NumRanges))
+    >;
+
+  s.NumRanges (e.ScannedRanges) /* пусто */ (e.Vars) (e.Commands) =
+    s.NumRanges e.ScannedRanges (e.Vars) (e.Commands);
+}
+
+*===============================================================================
+* Генерация результата
+*===============================================================================
+
+GenResult {
+  (e.PatternVars) e.Result =
+    <DoGenResult
+      (e.PatternVars)
+      (/* alloc commands */) (/* other commands */)
+      0 /* счётчик новых элементов */
+      e.Result
+    >;
+}
+
+* Основные команды работы с образцом
+*  (CmdAllocateElem s.Number s.ElType e.Info)
+*  (CmdLinkBrackets s.Left s.Right)
+*  (CmdPushStack s.Number)
+*  (CmdInsertVar s.Pos s.Usings s.Mode e.Index)
+
+
+/*
+  Порядок выполнения команд.
+  1. Все выделения памяти (в порядке перечисления)
+  2. Связывание крулых и угловых скобок и
+  построение результата (в обратном порядке)
+*/
+
+*$ENUM TkString, TkCloseBracket, TkCloseCall
+
+DoGenResult {
+  /* Оптимизация для распределения последовательности char’ов */
+  (e.Vars) (e.AllocCommands) (e.Commands) s.Counter
+  (Symbol Char s.Char1) (Symbol Char s.Char2) e.Result =
+    <DoGenResult
+      (e.Vars) (e.AllocCommands) (e.Commands) s.Counter
+      (TkString 2 s.Char1 s.Char2) e.Result
+    >;
+
+  (e.Vars) (e.AllocCommands) (e.Commands)
+  s.Counter (Symbol Char s.Value) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElSymbol Char s.Value))
+      (e.Commands)
+      s.Counter e.Result
+    >;
+
+  (e.Vars) (e.AllocCommands) (e.Commands) s.Counter
+  (TkString s.Len e.String) (Symbol Char s.Char) e.Result =
+    <DoGenResult
+      (e.Vars) (e.AllocCommands) (e.Commands) s.Counter
+      (TkString <Inc s.Len> e.String s.Char) e.Result
+    >;
+
+  (e.Vars) (e.AllocCommands) (e.Commands) s.Counter
+  (TkString s.Len e.String) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElString s.Len e.String))
+      (e.Commands)
+      s.Counter e.Result
+    >;
+
+  /* Создаём литералы */
+  (e.Vars) (e.AllocCommands) (e.Commands)
+  s.Counter (Symbol s.Type e.Value) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElSymbol s.Type e.Value))
+      (e.Commands)
+      s.Counter e.Result
+    >;
+
+  /*
+    Обработка открывающих скобок всех типов осуществляется похоже.
+  */
+  (e.Vars) (e.AllocCommands) (e.Commands)
+  s.Counter (Brackets e.InBrackets) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElOpenBracket s.Counter))
+      (e.Commands)
+      <Inc s.Counter> e.InBrackets (TkCloseBracket s.Counter) e.Result
+    >;
+
+  (e.Vars) (e.AllocCommands) (e.Commands)
+  s.Counter (CallBrackets e.InBrackets) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElOpenCall s.Counter))
+      (e.Commands)
+      <Inc s.Counter> e.InBrackets (TkCloseCall s.Counter) e.Result
+    >;
+
+  /*
+    Закрывающие скобки надо обрабатывать особым образом.
+    Круглые скобки и АТД — слинковать, угловые — добавить в стек.
+  */
+  (e.Vars) (e.AllocCommands) (e.Commands) s.Counter
+  (TkCloseBracket s.OpenCounter) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElCloseBracket s.Counter))
+      (
+        (CmdLinkBrackets s.OpenCounter s.Counter)
+        e.Commands
+      )
+      <Inc s.Counter> e.Result
+    >;
+
+  (e.Vars) (e.AllocCommands) (e.Commands) s.Counter
+  (TkCloseCall s.OpenCounter) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElCloseCall s.Counter))
+      (
+        (CmdPushStack s.Counter)
+        (CmdPushStack s.OpenCounter)
+        e.Commands
+      )
+      <Inc s.Counter> e.Result
+    >;
+
+  /* Оптимизация: частный случай для s-переменных, их проще всегда копировать */
+  (e.Vars) (e.AllocCommands) (e.Commands)
+  s.Counter (Variable 's' e.Index) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElVariable 's' e.Index))
+      (e.Commands)
+      s.Counter e.Result
+    >;
+
+  /* Переменная есть в образце — переносим, позиция подготовлена */
+  (e.Vars-B (s.Usings s.Mode e.Index) e.Vars-E)
+  (e.AllocCommands (CmdAllocateElem ElSavePos s.InsertPos)) (e.Commands)
+  s.Counter (Variable s.Mode e.Index) e.Result =
+    <DoGenResult
+      (e.Vars-B <DecUsings s.Usings s.Mode e.Index> e.Vars-E)
+      (e.AllocCommands (CmdAllocateElem ElSavePos s.InsertPos))
+      /* вставляем в конец списка команд */
+      (
+        e.Commands
+        (CmdInsertVar s.InsertPos s.Usings s.Mode e.Index)
+      )
+      s.Counter e.Result
+    >;
+
+  /* Переменная есть в образце — переносим, позиция не подготовлена */
+  (e.Vars-B (s.Usings s.Mode e.Index) e.Vars-E) (e.AllocCommands) (e.Commands)
+  s.Counter (Variable s.Mode e.Index) e.Result =
+    <DoGenResult
+      (e.Vars-B <DecUsings s.Usings s.Mode e.Index> e.Vars-E)
+      (e.AllocCommands (CmdAllocateElem ElSavePos s.Counter))
+      /* вставляем в конец списка команд */
+      (
+        e.Commands
+        (CmdInsertVar s.Counter s.Usings s.Mode e.Index)
+      )
+      <Inc s.Counter> e.Result
+    >;
+
+  /* Переменной нет в образце — копируем */
+  (e.Vars) (e.AllocCommands) (e.Commands)
+  s.Counter (Variable s.Mode e.Index) e.Result =
+    <DoGenResult
+      (e.Vars)
+      (e.AllocCommands (CmdAllocateElem ElVariable s.Mode e.Index))
+      (e.Commands)
+      s.Counter e.Result
+    >;
+
+  /* Завершение просмотра */
+  (e.UnusedVars) (e.AllocCommands) (e.Commands) s.Counter =
+    s.Counter (e.UnusedVars) (e.AllocCommands e.Commands);
+}
+
+DecUsings {
+  1 s.Mode e.Index = /* пусто */;
+  s.Usings s.Mode e.Index = (<Dec s.Usings> s.Mode e.Index);
+}
+
+
+ComposeSentenceCommands {
+  s.NumRanges (e.PatternVars) (e.PatternCommands)
+  s.ResultCounter (e.UnusedVars) (e.ResultCommands) =
+    <ComposeSentenceCommands-Aux
+      s.NumRanges s.ResultCounter (e.ResultCommands)
+      <FilterCommonVarsAndPatternCommands
+        (e.PatternVars) (e.PatternCommands) e.UnusedVars
+      >
+    >;
+}
+
+FilterCommonVarsAndPatternCommands {
+  /*
+    Если в образце e-переменная имеет счётчик 1, значит, повторных
+    e-переменных с этим индексом не было. Если эта переменная есть
+    ещё и в списке unused, значит, она не используется.
+  */
+  (e.PatternVars-B (1 'e' e.Index) e.PatternVars-E)
+  (
+    e.PatternCommands-B
+    (CmdClosedE s.Num 'e' e.Index)
+    e.PatternCommands-E
+  )
+  (1 'e' e.Index) e.Unuseds =
+    <FilterCommonVarsAndPatternCommands
+      (e.PatternVars-B e.PatternVars-E)
+      (
+        e.PatternCommands-B
+        (CmdComment 'Unused closed variable e.' e.Index)
+        e.PatternCommands-E
+      )
+      e.Unuseds
+    >;
+
+  (e.PatternVars) (e.PatternCommands) t.OtherUnused e.Unuseds =
+    <FilterCommonVarsAndPatternCommands
+      (e.PatternVars) (e.PatternCommands) e.Unuseds
+    >;
+
+  (e.PatternVars) (e.PatternCommands) /* пусто */ =
+    (e.PatternVars) e.PatternCommands;
+}
+
+ComposeSentenceCommands-Aux {
+  s.NumRanges s.ResultCounter (e.ResultCommands)
+  (e.PatternVars) e.PatternCommands =
+    <GenerateResult-OpenELoops
+      <Map generator_MakeDeclaration e.PatternVars>
+      (CmdRangeArray s.NumRanges)
+      <MakeCmdResultCommand s.ResultCounter>
+      (CmdInitB0)
+      e.PatternCommands
+      (CmdEmptyResult)
+      e.ResultCommands
+      (CmdReturnResult)
+    >;
+}
+
+$ENTRY generator_MakeDeclaration {
+  (s.Usings s.Mode e.Index) =
+    (CmdDeclareVar s.Usings s.Mode e.Index)
+    <MakeDeclaration-Aux s.Usings s.Mode e.Index>;
+}
+
+MakeDeclaration-Aux {
+  1 s.Mode e.Index = /* это была последняя */;
+
+  s.Usings s.Mode e.Index =
+    <generator_MakeDeclaration (<Dec s.Usings> s.Mode e.Index)>;
+}
+
+MakeCmdResultCommand {
+  0 = /* пусто */;
+  s.Counter = (CmdResultArray s.Counter);
+}
+
+GenerateResult-OpenELoops {
+  e.Commands-B (CmdOpenedE s.BracketNum 'e' e.Index) e.Commands-E =
+    e.Commands-B
+    (CmdOpenedE-Start s.BracketNum 'e' e.Index)
+    <GenerateResult-OpenELoops e.Commands-E>
+    (CmdOpenedE-End s.BracketNum 'e' e.Index);
+
+  e.Commands = e.Commands;
+}

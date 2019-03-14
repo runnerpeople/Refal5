@@ -547,10 +547,12 @@ class Calculation(object):
                 if is_symbol(term_left) and is_symbol(term_right) and term_left == term_right:
                     return "Success", substitution, system, eq
                 elif isinstance(term_right, Variable) and term_right.type_variable == Type.t:
-                    substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
+                    if term_right.index != -1:
+                        substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
                     return "Success", substitution, system, eq
                 elif (isinstance(term_right, Variable) and term_right.type_variable == Type.s) or is_symbol(term_right):
-                    substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
+                    if (isinstance(term_right, Variable) and term_right.index != -1) or not isinstance(term_right, Variable):
+                        substitution.append(Substitution(Expression([term_left]), Expression([term_right])))
                     return "Success", substitution, system, eq
                 elif isinstance(term_left, StructuralBrackets) and isinstance(term_right, StructuralBrackets):
                     eq.type_equation = EqType.Expr
@@ -747,7 +749,7 @@ class Calculation(object):
             return Variable("generated%d".format(index), Type.t, None, index)
         if isinstance(term_right, StructuralBrackets):
             index = generate_index()
-            return Variable("generated%d".format(index), Type.s, None, index)
+            return Variable("generated%d".format(index), Type.t, None, index)
 
     def generalization_term(self, terms):
         terms_copy = deepcopy(terms)

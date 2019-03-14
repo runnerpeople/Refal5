@@ -1,0 +1,6 @@
+SaveFile (e.FileName) e.Lines = ;
+MapAccum t.Func t.Acc e.Terms = t.Acc e.Res;
+Map t.Func e.Terms = e.Res;
+Inc s.Num = s.Num;
+Dec s.Num = s.Num;
+DelAccumulator t.Acc e.Value = e.Value;
