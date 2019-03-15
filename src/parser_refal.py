@@ -53,7 +53,7 @@ class ParserRefal(object):
                         has_definition_type = True
 
         if not has_definition_type and not has_body:
-            sys.stderr.write("Error. Unknown function %s\n" % (term.value))
+            sys.stderr.write("Error. Unknown function %s\n" % term.value)
             self.isError = True
 
     def semantics_call(self, ast_type):
@@ -78,7 +78,7 @@ class ParserRefal(object):
                     for variable in out_variables:
                         if variable not in variables:
                             sys.stderr.write(
-                                "Error. Variable %s isn't found in previous sentence" % (variable))
+                                "Error. Variable %s isn't found in previous sentence" % variable)
                             self.isError = True
             if sentence.block:
                 self.semantics_variable(sentence.block)
@@ -86,7 +86,7 @@ class ParserRefal(object):
                 out_variables = self.get_variables(term)
                 for variable in out_variables:
                     if variable not in variables:
-                        sys.stderr.write("Error. Variable %s isn't found in previous sentence\n" % (variable))
+                        sys.stderr.write("Error. Variable %s isn't found in previous sentence\n" % variable)
                         self.isError = True
 
     def semantics(self):

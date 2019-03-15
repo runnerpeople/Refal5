@@ -1,0 +1,7 @@
+R05-LexScan-File e.FileName = e.Tokens;
+R05-LexScan-String e.Text = e.Tokens;
+TkOpen s.Bracket = e.TextRep;
+TkClose s.Bracket = e.TextRep;
+Map t.Func e.Items = e.ResItems;
+Reduce t.Func t.Acc e.Items = t.Acc;
+StrFromToken s.TokType e.Info = e.HumanReadableRep;

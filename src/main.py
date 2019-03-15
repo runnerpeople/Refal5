@@ -64,6 +64,8 @@ while cur_token_refal.tag != DomainTag.Eop:
         print(cur_token_refal)
     list_token_refal.append(cur_token_refal)
 
+list_token_refal = refactor_char_token(list_token_refal)
+
 if DEBUG_MODE:
     print(LINE_DELIMITER)
 
@@ -80,6 +82,8 @@ if lexer_type is not None:
             print(cur_token_type)
         list_token_type.append(cur_token_type)
 
+list_token_type = refactor_char_token(list_token_type)
+
 cur_token_built_in_type = lexer_built_in_type.next_token()
 list_token_built_in_type = [cur_token_built_in_type]
 
@@ -93,6 +97,7 @@ while cur_token_built_in_type.tag != DomainTag.Eop:
 
 if DEBUG_MODE:
     print(LINE_DELIMITER)
+
 
 file_refal.close()
 
@@ -135,11 +140,6 @@ else:
 
 parser_refal.semantics_call(refal_type_ast)
 
-    # if DEBUG_MODE:
-    #     print(parser_refal_type.ast)
-
 if not parser_refal.isError and ((parser_refal_type is not None and not parser_refal_type.isError) or
                                  parser_refal_type is None):
     calculation = Calculation(parser_refal.ast, refal_type_ast)
-
-

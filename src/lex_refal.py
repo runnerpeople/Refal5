@@ -12,6 +12,36 @@ def next_or_current(obj):
     return next(deepcopy(obj), obj)
 
 
+def refactor_char_token(tokens):
+    i = 0
+    while i < len(tokens):
+        if isinstance(tokens[i], CharacterToken):
+            if len(tokens[i].value) > 3:
+                new_tokens = []
+                ch = ""
+                position = deepcopy(tokens[i].coords)
+                for j in range(len(tokens[i].value)):
+                    if tokens[i].value[j] == "'" and ch == "":
+                        continue
+                    if ch == "\\" and tokens[i].value[j] != "\\":
+                        ch += tokens[i].value[j]
+                        ch = "'" + ch + "'"
+                        new_tokens.append(CharacterToken(ch, position))
+                        ch = ""
+                    elif tokens[i].value[j] == "\\":
+                        ch += tokens[i].value[j]
+                    else:
+                        ch += tokens[i].value[j]
+                        ch = "'" + ch + "'"
+                        new_tokens.append(CharacterToken(ch, position))
+                        ch = ""
+                if len(new_tokens) > 1:
+                    tokens = tokens[:i] + new_tokens + tokens[i+1:]
+                    i = -1
+        i += 1
+    return tokens
+
+
 class Lexer(object):
 
     def __init__(self, program):

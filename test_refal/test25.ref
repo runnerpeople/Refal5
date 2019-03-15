@@ -1,0 +1,6 @@
+$ENTRY Go { = <F 'a' () 'zzzz'> }
+
+F {
+  'ab' () e.X = 1;
+  'ba' () e.X = 2;
+}

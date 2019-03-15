@@ -1,0 +1,14 @@
+F {
+  'abcd' = Letters;
+  1 2 3 4 = Numbers;
+}
+
+G {
+  'a' 'b' 'c' 'd' = Letters;
+  1 2 3 4 = Numbers;
+}
+
+H {
+  'ab' 'cd' = Letters;
+  12 34 = Numbers;
+}

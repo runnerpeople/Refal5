@@ -76,7 +76,8 @@ class ParserRefalType(object):
         common_term = []
         while self.cur_token.tag == DomainTag.Ident or self.cur_token.tag == DomainTag.Number or \
                 self.cur_token.tag == DomainTag.Characters or self.cur_token.tag == DomainTag.Composite_symbol \
-                or (self.cur_token.tag == DomainTag.Variable and (self.cur_token.value[0] == "s" or self.cur_token.value[0] == "t")) \
+                or (self.cur_token.tag == DomainTag.Variable and (self.cur_token.value[0] == "s" or
+                                                                  self.cur_token.value[0] == "t")) \
                 or (self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "("):
             if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "(":
                 self.cur_token = next(self.iteratorTokens)
