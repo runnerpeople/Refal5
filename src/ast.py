@@ -10,8 +10,8 @@ DEFAULT_FUNCTIONS = ["Mu", "Add", "Arg", "Br", "Card", "Chr", "Cp", "Dg", "Dgall
                      "Sub", "Symb", "Time", "Type", "Upper", "Freeze", "Dn",
                      "Up", "Ev-met", "Residue", "System", "Exit", "Close", "ExistFile", "GetCurrentDirectory",
                      "RemoveFile", "SizeOf", "GetPID", "GetPPID",
-                     "Implode_Ext", "Explode_Ext", "TimeElapsed", "Compare", "Random", "RandomDigit", "Write", "ListOfBuiltin",
-                     "Sysfun", "DeSysfun", "XMLParse", "GetEnv"]
+                     "Implode_Ext", "Explode_Ext", "TimeElapsed", "Compare", "Random", "RandomDigit", "Write",
+                     "ListOfBuiltin", "Sysfun", "DeSysfun", "XMLParse", "GetEnv"]
 
 
 class AST(object):
@@ -216,7 +216,6 @@ class Variable(Term):
         return isinstance(other, Variable) and self.type_variable == other.type_variable and self.index == other.index
 
     def __str__(self):
-        # return self.value
         if self.type_variable == Type.s:
             return "s." + str(self.index)
         elif self.type_variable == Type.t:

@@ -176,10 +176,6 @@ class Calculation(object):
         self.substitution = []
 
         self.system = self.create_equation()
-        # for eq in self.system:
-        #     print(eq)
-        #
-        # sys.exit(1)
 
         if len(self.system) == 0:
             while True:
@@ -217,7 +213,8 @@ class Calculation(object):
 
                 # self.substitution = [format_function for format_function in format_functions
                 #                      if not isinstance(format_function.left_part.terms[0], SpecialVariable)
-                #                      and not format_function.right_part.terms == [SpecialVariable("@", SpecialType.none)]
+                #                      and not format_function.right_part.terms ==
+                #                      [SpecialVariable("@", SpecialType.none)]
                 #                      ]
 
                 if self.is_fixed_point(self.format_function, format_functions_result):
@@ -245,8 +242,10 @@ class Calculation(object):
 
                         if status == "Failure":
                             sys.stderr.write("Function %s, sentence %d, there isn't solution for equation: %s [%s]" % (
-                                self.system[k].func_name, self.system[k].index_sentence, self.system[k], self.apply_substitution(self.system[k].right_part, [*substitution, *self.format_function,
-                                                                            *self.default_format_function])))
+                                self.system[k].func_name, self.system[k].index_sentence, self.system[k],
+                                self.apply_substitution(self.system[k].right_part,
+                                                        [*substitution, *self.format_function,
+                                                         *self.default_format_function])))
                             sys.exit(1)
                     else:
                         substitution = [Substitution(eq.left_part, eq.right_part)]
@@ -273,7 +272,7 @@ class Calculation(object):
                                     Expression([SpecialVariable(function.name, SpecialType.in_function)]),
                                     sentence.pattern))
 
-                                if all(self.contains_call(term) == False for term in sentence.result.terms):
+                                if all(not self.contains_call(term) for term in sentence.result.terms):
                                     format_substitution_function.append(Substitution(
                                         Expression([SpecialVariable(function.name, SpecialType.out_function)]),
                                         sentence.result))
@@ -300,18 +299,14 @@ class Calculation(object):
 
                     # self.substitution = [format_function for format_function in format_functions
                     #                      if not isinstance(format_function.left_part.terms[0], SpecialVariable)
-                    #                      and not format_function.right_part.terms == [SpecialVariable("@", SpecialType.none)]
+                    #                      and not format_function.right_part.terms ==
+                    #                      [SpecialVariable("@", SpecialType.none)]
                     #                      ]
 
                     if self.is_fixed_point(self.format_function, format_functions_result):
                         self.system.remove(self.system[k])
                         break
                     else:
-                        # for format_function in self.format_function:
-                        #     print(format_function)
-                        # for format_substitution in self.substitution:
-                        #     print(format_substitution)
-                        # print("++++++++++++++++++++++")
                         self.format_function = format_functions_result
                         self.substitution = substitution_result
                         break
@@ -418,7 +413,8 @@ class Calculation(object):
                         # if (isinstance(common_format[key_group][0].terms[i], Variable) and isinstance(
                         #         common_format[key_group][0].terms[i], Variable)):
                         #     print(
-                        #         common_format[key_group][0].terms[i].type_variable == common_format[key_group][1].terms[
+                        #         common_format[key_group][0].terms[i].type_variable ==
+                        #         common_format[key_group][1].terms[
                         #             i].type_variable)
                         # print(common_format[key_group][0].terms[i] == common_format[key_group][1].terms[i])
                         # print(common_format[key_group][0].terms[i])
@@ -630,7 +626,8 @@ class Calculation(object):
 
                     status, subst, syst, e = self.calculate_equation(Equation(Expression([eq.left_part.terms[0]]),
                                                                               Expression([eq.right_part.terms[0]]),
-                                                                              EqType.Term, eq.func_name, eq.index_sentence), subst, syst)
+                                                                              EqType.Term, eq.func_name,
+                                                                              eq.index_sentence), subst, syst)
 
                     eq.left_part.terms = eq.left_part.terms[1:]
                     eq.right_part.terms = eq.right_part.terms[1:]
@@ -650,7 +647,8 @@ class Calculation(object):
 
                     status, subst, syst, e = self.calculate_equation(Equation(Expression([eq.left_part.terms[-1]]),
                                                                               Expression([eq.right_part.terms[-1]]),
-                                                                              EqType.Term, eq.func_name, eq.index_sentence), subst, syst)
+                                                                              EqType.Term, eq.func_name,
+                                                                              eq.index_sentence), subst, syst)
 
                     eq.left_part.terms = eq.left_part.terms[:-1]
                     eq.right_part.terms = eq.right_part.terms[:-1]
@@ -725,7 +723,7 @@ class Calculation(object):
                 if len(eq.right_part.terms) == 0:
                     if all(isinstance(term, Variable) and term.type_variable == Type.e for term in
                            eq.left_part.terms):
-                        for term in eq.left_part.terms:
+                        for _ in eq.left_part.terms:
                             substitution.append(Substitution(eq.left_part, Expression([])))
                         return "Success", substitution, system, eq
                     else:
