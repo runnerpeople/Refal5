@@ -4,23 +4,19 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
-DEFAULT_FUNCTIONS = ["Mu", "Add", "Arg", "Br", "Card", "Chr", "Cp", "Dg", "Dgall", "Div", "Divmod",
-                     "Explode", "First", "Get", "Implode", "Last", "Lenw", "Lower", "Mod", "Mul",
-                     "Numb", "Open", "Ord", "Print", "Prout", "Put", "Putout", "Rp", "Step",
-                     "Sub", "Symb", "Time", "Type", "Upper", "Freeze", "Dn",
-                     "Up", "Ev-met", "Residue", "System", "Exit", "Close", "ExistFile", "GetCurrentDirectory",
-                     "RemoveFile", "SizeOf", "GetPID", "GetPPID",
-                     "Implode_Ext", "Explode_Ext", "TimeElapsed", "Compare", "Random", "RandomDigit", "Write",
-                     "ListOfBuiltin", "Sysfun", "DeSysfun", "XMLParse", "GetEnv"]
+from src.constants import *
 
 
 class AST(object):
 
-    def __init__(self, functions):
+    def __init__(self, functions, is_file_type=False):
 
-        # Для доступности default-функций:
-        default_functions = [Extern(name) for name in DEFAULT_FUNCTIONS]
-        self.functions = [*default_functions, *functions]
+        if not is_file_type:
+            # Для доступности default-функций:
+            default_functions = [Extern(name) for name in DEFAULT_FUNCTIONS]
+            self.functions = [*default_functions, *functions]
+        else:
+            self.functions = functions
 
     def __str__(self):
         return str("\n".join(list(map(str, self.functions))))

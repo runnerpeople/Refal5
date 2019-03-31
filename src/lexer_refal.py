@@ -3,6 +3,7 @@
 
 from src.position import *
 from src.tokens import *
+from src.constants import *
 
 from copy import deepcopy
 import sys
@@ -225,7 +226,8 @@ class Lexer(object):
         s += new_pos.letter()
         new_pos = next(new_pos, new_pos)
         s += new_pos.letter()
-        # sys.stdout.write("Recognize many-line comment[" + str(Fragment(self.cur, new_pos)) +  "]: " + s + "\n")
+        if DEBUG_MODE:
+            sys.stdout.write("Recognize many-line comment[" + str(Fragment(self.cur, new_pos)) + "]: " + s + "\n")
         new_pos = next_or_current(new_pos)
         self.cur = new_pos
 
@@ -236,7 +238,8 @@ class Lexer(object):
             s += new_pos.letter()
             new_pos = next_or_current(new_pos)
         new_pos = next_or_current(new_pos)
-        # sys.stdout.write("Recognize one-line comment[" + str(Fragment(self.cur, new_pos)) +  "]: " + s + "\n")
+        if DEBUG_MODE:
+            sys.stdout.write("Recognize one-line comment[" + str(Fragment(self.cur, new_pos)) + "]: " + s + "\n")
         self.cur = new_pos
 
     def next_token(self):
