@@ -10,11 +10,11 @@ python setup.py install
 ### Как использовать
 На вход подается имя файла *.ref, который содержит программу, написанную на РЕФАЛ-5, файлы, содержащие форматы используемых функций.
 ```bash
-refalchecker R05-Parser.ref LibraryEx.type R05-Lexer.type
+refalcheck R05-Parser.ref LibraryEx.type R05-Lexer.type
 ```
 Результат программы можно перенаправить в файл:
 ```bash
-refalchecker R05-Parser.ref LibraryEx.type R05-Lexer.type R05-Parser.type
+refalcheck R05-Parser.ref LibraryEx.type R05-Lexer.type R05-Parser.type
 ```
 В файле `constants.py` использует константы, конфигурируемые при запуске.
 

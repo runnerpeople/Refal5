@@ -1,9 +1,9 @@
 #! python -v
 # -*- coding: utf-8 -*-
 
-from src.ast import *
-from src.constants import *
-from src.utils import *
+from refal.ast import *
+from refal.constants import *
+from refal.utils import *
 
 from copy import deepcopy
 

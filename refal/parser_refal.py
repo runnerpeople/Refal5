@@ -1,8 +1,8 @@
 #! python -v
 # -*- coding: utf-8 -*-
 
-from src.tokens import *
-from src.ast import *
+from refal.tokens import *
+from refal.ast import *
 
 import sys
 

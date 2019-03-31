@@ -1,9 +1,9 @@
 #! python -v
 # -*- coding: utf-8 -*-
 
-from src.position import *
-from src.tokens import *
-from src.constants import *
+from refal.position import *
+from refal.tokens import *
+from refal.constants import *
 
 from copy import deepcopy
 import sys

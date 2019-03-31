@@ -4,7 +4,7 @@
 from os.path import *
 
 # Switch on/off debug information for program
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 # If DEBUG_MODE = True, then include directory, where contains refal program
 TEST_DIRECTORY = join(dirname(dirname(__file__)), 'test_refal').replace("\\", "/")

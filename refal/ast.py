@@ -4,7 +4,7 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from src.constants import *
+from refal.constants import *
 
 
 class AST(object):

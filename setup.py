@@ -5,10 +5,10 @@ import io
 import os
 import sys
 from shutil import rmtree
+from refal import __version__
 
-from setuptools import setup, Command
+from setuptools import find_packages, setup, Command
 
-__version__ = '.'.join(map(str, sys.version_info[0:2]))
 
 NAME = 'refalchecker'
 DESCRIPTION = 'Calculating/Verifying format of functions in Refal-5'
@@ -16,10 +16,10 @@ URL = 'https://github.com/runnerpeople/Refal5'
 EMAIL = 'gosha8352@gmail.com'
 AUTHOR = 'George Ivanov'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = None
+VERSION = '.'.join(__version__.__version__)
 
 REQUIRED = [
-    'enum', 'abc', 'argparse'
+    'argparse'
 ]
 
 EXTRAS = {}
@@ -31,10 +31,6 @@ try:
         long_description = '\n' + f.read()
 except FileNotFoundError:
     long_description = DESCRIPTION
-
-about = {}
-about['__version__'] = VERSION
-
 
 class UploadCommand(Command):
     """Support setup.py upload."""
@@ -74,7 +70,7 @@ class UploadCommand(Command):
 
 setup(
     name=NAME,
-    version=about['__version__'],
+    version=VERSION,
     description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type='text/markdown',
@@ -82,7 +78,7 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    py_modules=['src'],
+    packages=find_packages(),
 
     install_requires=REQUIRED,
     extras_require=EXTRAS,
@@ -100,4 +96,7 @@ setup(
     cmdclass={
         'upload': UploadCommand,
     },
+    entry_points={
+        'console_scripts': ['refalcheck=refal.refalcheck:main'],
+    }
 )

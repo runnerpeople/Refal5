@@ -1,10 +1,10 @@
 #! python -v
 # -*- coding: utf-8 -*-
 
-from src.lexer_refal import *
-from src.parser_refal import *
-from src.algorithm import *
-from src.constants import *
+from refal.lexer_refal import *
+from refal.parser_refal import *
+from refal.algorithm import *
+from refal.constants import *
 
 import sys
 import argparse
@@ -77,32 +77,36 @@ def append_ast(parser_left, parser_right):
     else:
         sys.stderr.write("Can't append AST, because it was error")
 
+def main():
+    arg_parse = new_parser()
+    args = arg_parse.parse_args()
 
-arg_parse = new_parser()
-args = arg_parse.parse_args()
-
-file_refal_path = None
-if DEBUG_MODE:
-    file_refal_path = join(TEST_DIRECTORY, args.file + REFAL_TYPE).replace("\\", "/")
-else:
-    file_refal_path = args.file
-
-parser_refal = calculate_ast(file_refal_path)
-
-file_type_path = "built-in.type"
-parser_refal_type = calculate_ast(file_type_path, True)
-
-for file in args.file_type:
+    file_refal_path = None
     if DEBUG_MODE:
-        file_refal_path = join(TEST_DIRECTORY, file + REFAL_TYPE).replace("\\", "/")
+        file_refal_path = join(TEST_DIRECTORY, args.file + REFAL_TYPE).replace("\\", "/")
     else:
-        file_refal_path = file
+        file_refal_path = args.file
 
-    append_ast(parser_refal_type, calculate_ast(file_refal_path, True))
+    parser_refal = calculate_ast(file_refal_path)
 
-parser_refal.semantics_call(parser_refal_type.ast)
+    file_type_path = "built-in.type"
+    parser_refal_type = calculate_ast(file_type_path, True)
 
-if not parser_refal.isError and not parser_refal_type.isError:
-    calculation = Calculation(parser_refal.ast, parser_refal_type.ast)
-    calculation.calculate_system()
-    print(calculation.print_format_function())
+    for file in args.file_type:
+        if DEBUG_MODE:
+            file_refal_path = join(TEST_DIRECTORY, file + REFAL_TYPE).replace("\\", "/")
+        else:
+            file_refal_path = file
+
+        append_ast(parser_refal_type, calculate_ast(file_refal_path, True))
+
+    parser_refal.semantics_call(parser_refal_type.ast)
+
+    if not parser_refal.isError and not parser_refal_type.isError:
+        calculation = Calculation(parser_refal.ast, parser_refal_type.ast)
+        calculation.calculate_system()
+        print(calculation.print_format_function())
+
+
+if __name__ == "__main__":
+    main()
