@@ -1,0 +1,41 @@
+EL-Create {
+  = (ErrorList);
+}
+
+EL-AddErrorAt {
+  (ErrorList e.Errors) t.SrcPos e.Message =
+    (ErrorList e.Errors (t.SrcPos e.Message));
+}
+
+EL-AddUnexpected {
+  t.ErrorList (TkError t.SrcPos e.Message) e.Expected =
+    <EL-AddErrorAt
+      t.ErrorList t.SrcPos e.Message
+    >;
+
+  t.ErrorList (TkUnexpected t.SrcPos e.Unexpected) e.Expected =
+    <EL-AddErrorAt
+      t.ErrorList t.SrcPos
+      'Unknown characters "' e.Unexpected '"'
+    >;
+
+  t.ErrorList (s.Unexpected t.SrcPos e.Info) e.Expected =
+    <EL-AddErrorAt
+      t.ErrorList t.SrcPos
+      'Unexpected ' <StrFromToken s.Unexpected e.Info>
+      ', expected ' e.Expected
+    >;
+}
+
+EL-Destroy {
+  (ErrorList e.Errors) = e.Errors;
+}
+
+$ENTRY StrFromToken {
+  TkNative (e.SrcFile s.Line) e.Code =
+    '"%%...%%" at ' <Symb s.Line> ', "' e.SrcFile '"';
+
+  TkUnexpected e.Unexpected = 'Unexpected characters <' e.Unexpected '>';
+
+  s.Other e.Info = '"' <Mu s.Other e.Info> '"';
+}

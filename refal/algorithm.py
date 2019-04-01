@@ -330,9 +330,9 @@ class Calculation(object):
                 self.prepare_func_rec(function.sentences, index)
 
     def prepare_func_rec(self, sentences, index):
+        variable_dict_index = dict()
         for sentence in sentences:
             index += 1
-            variable_dict_index = dict()
             for term in sentence.pattern.terms:
                 variables = self.get_variables(term)
                 for i in range(len(variables)):
@@ -559,6 +559,14 @@ class Calculation(object):
                     else:
                         self.format_function = format_functions_result
                         self.substitution = substitution_result
+
+                        if DEBUG_MODE:
+                            print(LINE_DELIMITER)
+                            for substitution in self.substitution:
+                                print(substitution)
+                            for format_function in self.format_function:
+                                print(format_function)
+                            print(LINE_DELIMITER)
                         break
 
         if DEBUG_MODE:

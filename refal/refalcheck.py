@@ -83,7 +83,7 @@ def main():
 
     file_refal_path = None
     if DEBUG_MODE:
-        file_refal_path = join(TEST_DIRECTORY, args.file + REFAL_TYPE).replace("\\", "/")
+        file_refal_path = join(TEST_DIRECTORY, args.file).replace("\\", "/")
     else:
         file_refal_path = args.file
 
@@ -94,7 +94,7 @@ def main():
 
     for file in args.file_type:
         if DEBUG_MODE:
-            file_refal_path = join(TEST_DIRECTORY, file + REFAL_TYPE).replace("\\", "/")
+            file_refal_path = join(TEST_DIRECTORY, file).replace("\\", "/")
         else:
             file_refal_path = file
 
