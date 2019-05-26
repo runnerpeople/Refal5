@@ -7,7 +7,7 @@ from os.path import *
 DEBUG_MODE = True
 
 # If DEBUG_MODE = True, then include directory, where contains refal program
-TEST_DIRECTORY = join(dirname(dirname(__file__)), 'test_refal').replace("\\", "/")
+TEST_DIRECTORY = join(dirname(dirname(__file__)), 'tests', 'files').replace("\\", "/")
 
 # List of default Refal-functions
 DEFAULT_FUNCTIONS = ["Mu", "Add", "Arg", "Br", "Card", "Chr", "Cp", "Dg", "Dgall", "Div", "Divmod",

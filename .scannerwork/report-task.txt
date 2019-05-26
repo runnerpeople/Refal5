@@ -1,0 +1,7 @@
+organization=runnerpeople-github
+projectKey=runnerpeople_Refal5
+serverUrl=https://sonarcloud.io
+serverVersion=7.8.0.23279
+dashboardUrl=https://sonarcloud.io/dashboard?id=runnerpeople_Refal5
+ceTaskId=AWnuUQTtcuf6R8N43LAr
+ceTaskUrl=https://sonarcloud.io/api/ce/task?id=AWnuUQTtcuf6R8N43LAr

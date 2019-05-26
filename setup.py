@@ -32,6 +32,7 @@ try:
 except FileNotFoundError:
     long_description = DESCRIPTION
 
+
 class UploadCommand(Command):
     """Support setup.py upload."""
 
@@ -62,7 +63,7 @@ class UploadCommand(Command):
         os.system('twine upload dist/*')
 
         self.status('Pushing git tags…')
-        os.system('git tag v{0}'.format(about['__version__']))
+        os.system('git tag v{0}'.format('__version__'))
         os.system('git push --tags')
 
         sys.exit()

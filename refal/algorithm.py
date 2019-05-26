@@ -330,8 +330,8 @@ class Calculation(object):
                 self.prepare_func_rec(function.sentences, index)
 
     def prepare_func_rec(self, sentences, index):
-        variable_dict_index = dict()
         for sentence in sentences:
+            variable_dict_index = dict()
             index += 1
             for term in sentence.pattern.terms:
                 variables = self.get_variables(term)
@@ -386,7 +386,8 @@ class Calculation(object):
             if isinstance(exprs.terms[i], (Variable, SpecialVariable)):
                 exists_substitution = False
                 for substitution in subst:
-                    if substitution.left_part.terms[0] == exprs.terms[i]:
+                    if substitution.left_part.terms == exprs.terms:
+                    # if substitution.left_part.terms[0] == exprs.terms[i]:
                         # type(substitution.left_part.terms[0]) == type(exprs.terms[i]) and ...
                         exists_substitution = True
                         res.extend(self.apply_substitution(substitution.right_part, subst).terms)
@@ -481,7 +482,10 @@ class Calculation(object):
                     self.substitution = substitution_result
                     break
         else:
-            while len(self.system) > 0:
+            while True:
+
+                all_substitutions = []
+
                 for k in range(len(self.system)):
                     eq = deepcopy(self.system[k])
                     substitution = deepcopy(self.substitution)
@@ -508,66 +512,68 @@ class Calculation(object):
 
                     substitution = [subst for subst in substitution if not subst.left_part == subst.right_part]
 
-                    ast = deepcopy(self.ast)
+                    all_substitutions.extend(substitution)
 
-                    for function in ast.functions:
-                        if isinstance(function, Definition):
-                            for sentence in function.sentences:
-                                sentence.pattern = self.apply_substitution(sentence.pattern,
-                                                                           [*substitution, *self.format_function,
-                                                                            *self.default_format_function])
-                                sentence.result = self.apply_substitution(sentence.result,
-                                                                          [*substitution, *self.format_function,
-                                                                           *self.default_format_function])
-                    format_substitution_function = []
-                    for function in ast.functions:
-                        if isinstance(function, Definition):
-                            for sentence in function.sentences:
+                ast = deepcopy(self.ast)
 
+                for function in ast.functions:
+                    if isinstance(function, Definition):
+                        for sentence in function.sentences:
+                            sentence.pattern = self.apply_substitution(sentence.pattern,
+                                                                       [*all_substitutions, *self.format_function,
+                                                                        *self.default_format_function])
+                            sentence.result = self.apply_substitution(sentence.result,
+                                                                      [*all_substitutions, *self.format_function,
+                                                                       *self.default_format_function])
+                format_substitution_function = []
+                for function in ast.functions:
+                    if isinstance(function, Definition):
+                        for sentence in function.sentences:
+
+                            format_substitution_function.append(Substitution(
+                                Expression([SpecialVariable(function.name, SpecialType.in_function)]),
+                                sentence.pattern))
+
+                            if all(not self.contains_call(term) for term in sentence.result.terms):
                                 format_substitution_function.append(Substitution(
-                                    Expression([SpecialVariable(function.name, SpecialType.in_function)]),
-                                    sentence.pattern))
-
-                                if all(not self.contains_call(term) for term in sentence.result.terms):
-                                    format_substitution_function.append(Substitution(
-                                        Expression([SpecialVariable(function.name, SpecialType.out_function)]),
-                                        sentence.result))
-                    group_generalization = dict()
-                    for subst in [*substitution, *format_substitution_function, *self.default_format_function]:
-                        if subst.left_part not in group_generalization:
-                            group_generalization[subst.left_part] = [deepcopy(subst.right_part)]
-                        else:
-                            group_generalization[subst.left_part].append(deepcopy(subst.right_part))
-
-                    format_functions = []
-                    for key_group in group_generalization.keys():
-                        format_function = self.generalization(group_generalization[key_group])
-                        format_functions.append(Substitution(key_group, format_function))
-
-                    format_functions_result = [format_function for format_function in format_functions
-                                               if isinstance(format_function.left_part.terms[0], SpecialVariable)]
-
-                    substitution_result = []
-                    for format_function in format_functions:
-                        if not isinstance(format_function.left_part.terms[0], SpecialVariable) \
-                                and not format_function.right_part.terms == [SpecialVariable("@", SpecialType.none)]:
-                            substitution_result.append(format_function)
-
-                    if self.is_fixed_point(self.format_function, format_functions_result):
-                        self.system.remove(self.system[k])
-                        break
+                                    Expression([SpecialVariable(function.name, SpecialType.out_function)]),
+                                    sentence.result))
+                group_generalization = dict()
+                for subst in [*all_substitutions, *format_substitution_function, *self.default_format_function]:
+                    if subst.left_part not in group_generalization:
+                        group_generalization[subst.left_part] = [deepcopy(subst.right_part)]
                     else:
-                        self.format_function = format_functions_result
-                        self.substitution = substitution_result
+                        group_generalization[subst.left_part].append(deepcopy(subst.right_part))
 
-                        if DEBUG_MODE:
-                            print(LINE_DELIMITER)
-                            for substitution in self.substitution:
-                                print(substitution)
-                            for format_function in self.format_function:
-                                print(format_function)
-                            print(LINE_DELIMITER)
-                        break
+                format_functions = []
+                for key_group in group_generalization.keys():
+                    format_function = self.generalization(group_generalization[key_group])
+                    format_functions.append(Substitution(key_group, format_function))
+
+                format_functions_result = [format_function for format_function in format_functions
+                                           if len(format_function.left_part.terms) > 0 and
+                                           isinstance(format_function.left_part.terms[0], SpecialVariable)]
+
+                substitution_result = []
+                for format_function in format_functions:
+                    if len(format_function.left_part.terms) > 0 and \
+                            not isinstance(format_function.left_part.terms[0], SpecialVariable) \
+                            and not format_function.right_part.terms == [SpecialVariable("@", SpecialType.none)]:
+                        substitution_result.append(format_function)
+
+                if self.is_fixed_point(self.format_function, format_functions_result):
+                    break
+                else:
+                    self.format_function = format_functions_result
+                    self.substitution = substitution_result
+
+                    if DEBUG_MODE:
+                        print(LINE_DELIMITER)
+                        for substitution in self.substitution:
+                            print(substitution)
+                        for format_function in self.format_function:
+                            print(format_function)
+                        print(LINE_DELIMITER)
 
         if DEBUG_MODE:
             for substitution in self.substitution:
@@ -831,8 +837,11 @@ class Calculation(object):
 
             if left_e:
                 if right_e:
-                    index = generate_index()
-                    return Expression([Variable("generated%d".format(index), Type.e, None, index)])
+                    if left == right and len(left) == 1:
+                        return Expression(left)
+                    else:
+                        index = generate_index()
+                        return Expression([Variable("generated%d".format(index), Type.e, None, index)])
                 else:
                     for pattern in patterns:
                         pattern.terms.pop()

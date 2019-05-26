@@ -77,6 +77,7 @@ def append_ast(parser_left, parser_right):
     else:
         sys.stderr.write("Can't append AST, because it was error")
 
+
 def main():
     arg_parse = new_parser()
     args = arg_parse.parse_args()
