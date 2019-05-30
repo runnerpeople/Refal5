@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from refal.refalcheck import *
+import re
 
 import pytest
-import re
+
+from refal.refalcheck import *
+
 
 @pytest.fixture
 def built_in_parser():
@@ -39,10 +41,12 @@ def run_easy_test(name_file, built_in_parser, contain_file_type=False):
         calculation.calculate_system()
         output = calculation.print_format_function()
 
-        output_format = [line for line in output.split("\n") if line and line != '/* result program refalchecker */']
+        output_format = [line for line in output.split("\n") if line and line != '/* result program refalcheck */']
 
         return output_format
 
+
+@pytest.mark.timeout(1)
 def test_1(built_in_parser):
     output_format = run_easy_test("test1.ref", built_in_parser)
 
@@ -52,12 +56,14 @@ def test_1(built_in_parser):
     assert output_format[2] == "*Trans (e) e = e"
 
 
+@pytest.mark.timeout(1)
 def test_3(built_in_parser):
     output_format = run_easy_test("test3.ref", built_in_parser)
 
     assert output_format[0] == "*F s e = s"
 
 
+@pytest.mark.timeout(1)
 def test_4(built_in_parser):
     output_format = run_easy_test("test4.ref", built_in_parser)
 
@@ -70,6 +76,7 @@ def test_4(built_in_parser):
     assert output_format[6] == "*AddTableContent s e = e"
 
 
+@pytest.mark.timeout(1)
 def test_5(built_in_parser):
     output_format = run_easy_test("test5.ref", built_in_parser)
 
@@ -84,6 +91,7 @@ def test_5(built_in_parser):
     assert output_format[8] == "*Fix e = e"
 
 
+@pytest.mark.timeout(60)
 def test_6(built_in_parser):
     output_format = run_easy_test("test6.ref", built_in_parser)
 
@@ -96,6 +104,7 @@ def test_6(built_in_parser):
     assert output_format[6] == "*DoCountWordsInput (s) e = e"
 
 
+@pytest.mark.timeout(1)
 def test_7(built_in_parser):
     output_format = run_easy_test("test7.ref", built_in_parser)
 
@@ -104,12 +113,14 @@ def test_7(built_in_parser):
     assert output_format[2] == "*CheckNumber s (e) = s s s s e '\\n'"
 
 
+@pytest.mark.timeout(1)
 def test_8(built_in_parser):
     output_format = run_easy_test("test8.ref", built_in_parser)
 
     assert output_format[0] == "*DoHexDigit s e s = e"
 
 
+@pytest.mark.timeout(1)
 def test_10(built_in_parser):
     output_format = run_easy_test("test10.ref", built_in_parser)
 
@@ -118,44 +129,49 @@ def test_10(built_in_parser):
     assert output_format[2] == "*H e (e) = e"
 
 
+@pytest.mark.timeout(1)
 def test_11(built_in_parser):
     output_format = run_easy_test("test11.ref", built_in_parser)
 
     assert output_format[0] == "*Job e = e"
     assert output_format[1] == "*Trans (e) e = e"
-    assert output_format[2] == "*Fact s = s"
+    assert output_format[2] == "*Fact s = s e"
     assert output_format[3] == "*Table  = (('cane') 'dog') (('gatto') 'cat') (('cavallo') 'horse') (('rana') 'frog') " \
                                "(('porco') 'pig')"
     assert output_format[4] == "*Trans-line e = e"
 
 
+@pytest.mark.timeout(1)
 def test_12(built_in_parser):
     output_format = run_easy_test("test12.ref", built_in_parser)
 
     assert output_format[0] == "*F @ = @"
 
 
+@pytest.mark.timeout(1)
 def test_13(built_in_parser):
     output_format = run_easy_test("test13.ref", built_in_parser)
 
     assert output_format[0] == "*Fab (e) e = e"
 
 
+@pytest.mark.timeout(1)
 def test_14(built_in_parser):
     output_format = run_easy_test("test14.ref", built_in_parser, True)
 
     assert output_format[0] == "*F A e = A"
 
 
+@pytest.mark.timeout(1)
 def test_15(built_in_parser, capsys):
     _ = run_easy_test("test15.ref", built_in_parser)
 
     captured = capsys.readouterr()
     output = re.sub(r'\.[\d]+', '', captured.err)
-    assert output == "Function F, sentence 1, there isn't solution for equation: A A e : in(F) [A]"
+    assert output == "Function F, sentence 1, there isn't solution for equation: A A e : in[F] <=> A\n"
 
 
-def test_17(built_in_parser):
+def ttest_17(built_in_parser):
     output_format = run_easy_test("test17.ref", built_in_parser)
 
     assert output_format[0] == "Apply t e = e"
@@ -179,6 +195,7 @@ def test_17(built_in_parser):
     assert output_format[18] == "*Trim-R e = e"
 
 
+@pytest.mark.timeout(1)
 def test_18(built_in_parser):
     output_format = run_easy_test("test18.ref", built_in_parser, True)
 
@@ -187,6 +204,7 @@ def test_18(built_in_parser):
     assert output_format[2] == "*CompileSentence (e) (e) = e"
 
 
+@pytest.mark.timeout(1)
 def test_19(built_in_parser):
     output_format = run_easy_test("test19.ref", built_in_parser)
 
@@ -194,6 +212,7 @@ def test_19(built_in_parser):
     assert output_format[1] == "*StrFromSrcPos (s s) = e"
 
 
+@pytest.mark.timeout(1)
 def test_20(built_in_parser):
     output_format = run_easy_test("test20.ref", built_in_parser, True)
 
@@ -233,7 +252,8 @@ def te_21(built_in_parser):
     assert output_format[26] == "SymbolTextRep s t e = e"
     assert output_format[27] == "CmdEmpty (e) s = (e ']))') (e '  continue;')"
     assert output_format[28] == "CmdClosedE (e) s 'e' e = (e '];') (e '];')"
-    assert output_format[29] == "CmdOpenedE-Start (e) s 'e' e = (e ' = 0;') (e ' = 0;') (e 'r05_start_e_loop();') (e 'do {')"
+    assert output_format[29] == "CmdOpenedE-Start (e) s 'e' e = (e ' = 0;') (e ' = 0;') (e 'r05_start_e_loop();') (e " \
+                                "'do {')"
     assert output_format[30] == "CmdOpenedE-End (e) s 'e' e = (e '));') (e 'r05_stop_e_loop();')"
     assert output_format[31] == "CmdSave (e) s s = (e '];') (e '];')"
     assert output_format[32] == "CmdEmptyResult (e) = () (e 'r05_reset_allocator();')"
@@ -250,7 +270,8 @@ def te_21(built_in_parser):
     assert output_format[43] == "CmdLinkBrackets (e) s s = (e ']);')"
     assert output_format[44] == "CmdPushStack (e) s = (e ']);')"
     assert output_format[45] == "CmdInsertVar (e) s s s e = (e ');')"
-    assert output_format[46] == "CmdReturnResult (e) = (e 'r05_splice_from_freelist(arg_begin);') (e 'r05_splice_to_freelist(arg_begin, arg_end);') (e 'return;')"
+    assert output_format[46] == "CmdReturnResult (e) = (e 'r05_splice_from_freelist(arg_begin);') (e " \
+                                "'r05_splice_to_freelist(arg_begin, arg_end);') (e 'return;')"
     assert output_format[47] == "EscapeString e = e"
     assert output_format[48] == "EscapeChar s = s e"
     assert output_format[49] == "EscapeChar-Aux s s = s e"
@@ -281,7 +302,7 @@ def te_21(built_in_parser):
     assert output_format[74] == "GenerateResult-OpenELoops e = e"
 
 
-def te_22(built_in_parser):
+def ttest_22(built_in_parser):
     output_format = run_easy_test("test22.ref", built_in_parser, True)
 
     assert output_format[0] == "R05-Parse-File e = s e"
@@ -324,21 +345,21 @@ def te_22(built_in_parser):
     assert output_format[37] == "EL-Destroy (ErrorList e) = e"
 
 
-def te_23(built_in_parser):
+def test_23(built_in_parser):
     output_format = run_easy_test("test23.ref", built_in_parser)
 
     assert output_format[0] == "R05-TextFromTree e = e"
     assert output_format[1] == "Extern e = '$EXTERN ' e ';\\n'"
-    # assert output_format[2] == "Function s (e) t e = e s '\\n'"
+    assert output_format[2] == "Function s (e) t e = e s '\\n'"
     assert output_format[3] == "Entry  = '$ENTRY '"
     assert output_format[4] == "Local  = "
     assert output_format[5] == "Sentences e = e"
     assert output_format[6] == "*TextFromSentence ((e) (e)) = '  ' e ';\\n'"
     assert output_format[7] == "Native (e s) e = '* file: \"' e '%%\\n'"
     assert output_format[8] == "*FlatLines e = e"
-    # assert output_format[9] == "Symbol s e = e"
+    assert output_format[9] == "Symbol s e = e"
     assert output_format[10] == "Char s = '\\' s e '\\'"
-    # assert output_format[11] == "Number s = e"
+    assert output_format[11] == "Number s = e"
     assert output_format[12] == "Name t e = e"
     assert output_format[13] == "Variable s e = s '.' e"
     assert output_format[14] == "Brackets e = '(' e ')'"
@@ -352,6 +373,7 @@ def te_23(built_in_parser):
     assert output_format[22] == "*CharFromHex s = s"
 
 
+@pytest.mark.timeout(1)
 def test_24(built_in_parser):
     output_format = run_easy_test("test24.ref", built_in_parser)
 
@@ -360,25 +382,27 @@ def test_24(built_in_parser):
     assert output_format[2] == "*H s s e = s"
 
 
+@pytest.mark.timeout(1)
 def test_25(built_in_parser, capsys):
     _ = run_easy_test("test25.ref", built_in_parser)
 
     captured = capsys.readouterr()
     output = re.sub(r'\.[\d]+', '', captured.err)
-    assert output == "Function F, sentence 1, there isn't solution for equation: 'a' () 'z' 'z' 'z' 'z' : in(F) [s s " \
-                     "s e]"
+    assert output == "Function F, sentence 1, there isn't solution for equation: 'a' () 'z' 'z' 'z' 'z' : in[F] <=> s s () e\n"
 
 
+@pytest.mark.timeout(1)
 def test_26(built_in_parser):
     output_format = run_easy_test("test26.ref", built_in_parser)
 
     assert output_format[0] == "*EL-Create  = (ErrorList)"
     assert output_format[1] == "*EL-AddErrorAt (ErrorList e) t e = (ErrorList e (t e))"
-    assert output_format[2] == "*EL-AddUnexpected t (s t e) e = (ErrorList e (t e))"
+    assert output_format[2] == "*EL-AddUnexpected (ErrorList e) (s t e) e = (ErrorList e (t e))"
     assert output_format[3] == "*EL-Destroy (ErrorList e) = e"
     assert output_format[4] == "StrFromToken s e = s e s"
 
 
+@pytest.mark.timeout(1)
 def test_27(built_in_parser):
     output_format = run_easy_test("test27.ref", built_in_parser)
 
@@ -387,9 +411,34 @@ def test_27(built_in_parser):
     assert output_format[2] == "H 4 5 = "
 
 
+@pytest.mark.timeout(1)
 def test_28(built_in_parser):
-    output_format = run_easy_test("test27.ref", built_in_parser)
+    output_format = run_easy_test("test28.ref", built_in_parser)
 
-    assert output_format[0] == "*F  = 1 2 3"
-    assert output_format[1] == "*G 1 2 3 4 5 = "
-    assert output_format[2] == "H 4 5 = "
+    assert output_format[0] == "*F e s = "
+    assert output_format[1] == "*G (e) e = "
+    assert output_format[2] == "*H (e) e s = "
+
+
+@pytest.mark.timeout(1)
+def test_29(built_in_parser):
+    output_format = run_easy_test("test29.ref", built_in_parser)
+
+    assert output_format[0] == "*F t = "
+    assert output_format[1] == "*F2 t = "
+    assert output_format[2] == "*F3 t = "
+
+
+# @pytest.mark.timeout(1)
+# def test_30(built_in_parser):
+#     output_format = run_easy_test("test30.ref", built_in_parser)
+#
+#     assert output_format[0] == "*G (e) e = e"
+#     assert output_format[1] == "*F s e = e s"
+#
+# @pytest.mark.timeout(1)
+# def test_31(built_in_parser):
+#     output_format = run_easy_test("test31.ref", built_in_parser)
+#
+#     assert output_format[0] == "*G (e) e = e"
+#     assert output_format[1] == "*F s e = e s"

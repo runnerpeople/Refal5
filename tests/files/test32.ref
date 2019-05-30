@@ -1,0 +1,7 @@
+F { t.X e.Y = t.X }
+G { e.X t.Y = t.Y }
+
+H {
+    e.A s.B = e.A;
+    e.X = <F e.X> <G e.X>;
+}

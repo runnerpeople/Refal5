@@ -1,0 +1,3 @@
+F { e.X s.Y = }
+G { (e.X) e.Y = }
+H { e.X = <F e.X> <G e.X> }

@@ -16,7 +16,7 @@ def get_file_name(file_path):
 
 
 def new_parser():
-    parser = argparse.ArgumentParser(description="Arguments for program refalchecker")
+    parser = argparse.ArgumentParser(description="Arguments for program refalcheck")
     parser.add_argument("file", help="File for which format functions is calculated")
     parser.add_argument("file_type", nargs="*", help="Files, contained required format functions")
     return parser

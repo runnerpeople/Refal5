@@ -8,6 +8,7 @@ from shutil import rmtree
 from refal import __version__
 
 from setuptools import find_packages, setup, Command
+from setuptools.command.test import test as command_test
 
 
 NAME = 'refalchecker'
@@ -69,6 +70,23 @@ class UploadCommand(Command):
         sys.exit()
 
 
+class TestCommand(command_test):
+    user_options = [("pytest-args=", "a", "Arguments to pass to pytest")]
+
+    def initialize_options(self):
+        command_test.initialize_options(self)
+        self.pytest_args = ""
+
+    def run_tests(self):
+        import shlex
+
+        # import here, cause outside the eggs aren't loaded
+        import pytest
+
+        errno = pytest.main(shlex.split(self.pytest_args))
+        sys.exit(errno)
+
+
 setup(
     name=NAME,
     version=VERSION,
@@ -96,8 +114,11 @@ setup(
     # $ setup.py publish support.
     cmdclass={
         'upload': UploadCommand,
+        'test': TestCommand
     },
     entry_points={
         'console_scripts': ['refalcheck=refal.refalcheck:main'],
-    }
+    },
+    tests_require=["pytest"],
+    test_suite='tests'
 )

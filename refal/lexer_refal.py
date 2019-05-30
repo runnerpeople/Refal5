@@ -146,13 +146,14 @@ class Lexer(object):
                     s += new_pos.letter()
                     new_pos = next_or_current(new_pos)
                     if new_pos != next_or_current(new_pos):
-                        for i in range(0, 2):
+                        for _ in range(0, 2):
                             if new_pos.is_decimal_digit() or ("a" <= new_pos.letter() <= "f" or
                                                               "A" <= new_pos.letter() <= "F"):
                                 s += new_pos.letter()
                                 new_pos = next_or_current(new_pos)
                             else:
                                 return UnknownToken(s, Fragment(self.cur, new_pos))
+                        return CompositeSymbolToken(s, Fragment(self.cur, new_pos))
                 else:
                     return UnknownToken(s, Fragment(self.cur, new_pos))
             else:
@@ -178,13 +179,14 @@ class Lexer(object):
                     s += new_pos.letter()
                     new_pos = next_or_current(new_pos)
                     if new_pos != next_or_current(new_pos):
-                        for i in range(0, 2):
+                        for _ in range(0, 2):
                             if new_pos.is_decimal_digit() or ("a" <= new_pos.letter() <= "f" or
                                                               "A" <= new_pos.letter() <= "F"):
                                 s += new_pos.letter()
                                 new_pos = next_or_current(new_pos)
                             else:
                                 return UnknownToken(s, Fragment(self.cur, new_pos))
+                        return CharacterToken(s, Fragment(self.cur, new_pos))
                 else:
                     return UnknownToken(s, Fragment(self.cur, new_pos))
             else:

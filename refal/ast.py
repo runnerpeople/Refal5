@@ -86,6 +86,17 @@ class Sentence(object):
         self.result = result
         self.block = block
 
+        self.has_call = False
+        self.no_substitution = False
+
+    def __eq__(self, other):
+        return isinstance(other, Sentence) \
+               and self.pattern == other.pattern \
+               and self.conditions == other.conditions \
+               and self.result == other.result \
+               and self.block == other.block
+
+
     def __str__(self):
         result_str = str(self.pattern)
         if self.conditions:
@@ -95,7 +106,7 @@ class Sentence(object):
         if self.block:
             result_str += (": {" + ";\n".join(list(map(str, self.block))) + "}")
         if self.result is not None and not self.conditions and not self.block:
-            result_str += (" = " + str(self.result))
+            result_str += ("= " + str(self.result))
         return result_str
 
 
