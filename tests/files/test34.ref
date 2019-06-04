@@ -1,0 +1,11 @@
+F { e.X = <F2 e.X> <F3 e.X> }
+
+F2 {
+  I I = ;
+  I I e.X = <F2 e.X>;
+}
+
+F3 {
+  I I I = ;
+  I I I e.X = <F3 e.X>;
+}

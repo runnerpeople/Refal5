@@ -63,7 +63,7 @@ def test_3(built_in_parser):
     assert output_format[0] == "*F s e = s"
 
 
-@pytest.mark.timeout(1)
+@pytest.mark.timeout(10)
 def test_4(built_in_parser):
     output_format = run_easy_test("test4.ref", built_in_parser)
 
@@ -92,7 +92,7 @@ def test_5(built_in_parser):
 
 
 @pytest.mark.timeout(60)
-def test_6(built_in_parser):
+def ttest_6(built_in_parser):
     output_format = run_easy_test("test6.ref", built_in_parser)
 
     assert output_format[0] == "Go  = "
@@ -168,7 +168,7 @@ def test_15(built_in_parser, capsys):
 
     captured = capsys.readouterr()
     output = re.sub(r'\.[\d]+', '', captured.err)
-    assert output == "Function F, sentence 1, there isn't solution for equation: A A e : in[F] <=> A\n"
+    assert output == "Function F, sentence 0, there isn't solution for equation: A A e : in[F] <=> A\n"
 
 
 def ttest_17(built_in_parser):
@@ -339,13 +339,13 @@ def ttest_22(built_in_parser):
     assert output_format[31] == "CheckRepeatedDefinitions t e (e) = t e"
     assert output_format[32] == "RemoveReference (e) e = e"
     assert output_format[33] == "parser_AddUnresolved (ErrorList e) (t e) = (ErrorList e (t e))"
-    assert output_format[34] == "EL-Create  = t"
+    assert output_format[34] == "EL-Create  = (ErrorList)"
     assert output_format[35] == "EL-AddErrorAt (ErrorList e) t e = (ErrorList e (t e))"
     assert output_format[36] == "EL-AddUnexpected t (s t e) e = (ErrorList e (t e))"
     assert output_format[37] == "EL-Destroy (ErrorList e) = e"
 
 
-def test_23(built_in_parser):
+def ttest_23(built_in_parser):
     output_format = run_easy_test("test23.ref", built_in_parser)
 
     assert output_format[0] == "R05-TextFromTree e = e"
@@ -388,7 +388,7 @@ def test_25(built_in_parser, capsys):
 
     captured = capsys.readouterr()
     output = re.sub(r'\.[\d]+', '', captured.err)
-    assert output == "Function F, sentence 1, there isn't solution for equation: 'a' () 'z' 'z' 'z' 'z' : in[F] <=> s s () e\n"
+    assert output == "Function F, sentence 0, there isn't solution for equation: 'a' () 'z' 'z' 'z' 'z' : in[F] <=> s s () e\n"
 
 
 @pytest.mark.timeout(1)
@@ -429,16 +429,56 @@ def test_29(built_in_parser):
     assert output_format[2] == "*F3 t = "
 
 
-# @pytest.mark.timeout(1)
-# def test_30(built_in_parser):
-#     output_format = run_easy_test("test30.ref", built_in_parser)
-#
-#     assert output_format[0] == "*G (e) e = e"
-#     assert output_format[1] == "*F s e = e s"
-#
-# @pytest.mark.timeout(1)
-# def test_31(built_in_parser):
-#     output_format = run_easy_test("test31.ref", built_in_parser)
-#
-#     assert output_format[0] == "*G (e) e = e"
-#     assert output_format[1] == "*F s e = e s"
+@pytest.mark.timeout(1)
+def test_30(built_in_parser):
+    output_format = run_easy_test("test30.ref", built_in_parser)
+
+    assert output_format[0] == "*G (e) e = e"
+    assert output_format[1] == "*F s e = s"
+
+
+@pytest.mark.timeout(1)
+def test_31(built_in_parser):
+    output_format = run_easy_test("test31.ref", built_in_parser)
+
+    assert output_format[0] == "*G (e) e = e"
+    assert output_format[1] == "*F s e = s"
+
+
+@pytest.mark.timeout(1)
+def test_32(built_in_parser):
+    output_format = run_easy_test("test32.ref", built_in_parser)
+
+    assert output_format[0] == "*F t e = t"
+    assert output_format[1] == "*G e t = t"
+    assert output_format[2] == "*H e t = e"
+
+
+@pytest.mark.timeout(1)
+def test_33(built_in_parser):
+    output_format = run_easy_test("test33.ref", built_in_parser)
+
+    assert output_format[0] == "*F (((t))) = "
+    assert output_format[1] == "*F2 ((t)) = "
+    assert output_format[2] == "*F3 (((t))) = "
+
+
+@pytest.mark.timeout(1)
+def test_34(built_in_parser):
+    output_format = run_easy_test("test34.ref", built_in_parser)
+
+    assert output_format[0] == "*F I I I e = "
+    assert output_format[1] == "*F2 I I e = "
+    assert output_format[2] == "*F3 I I I e = "
+
+
+@pytest.mark.timeout(1)
+def test_35(built_in_parser):
+    output_format = run_easy_test("test35.ref", built_in_parser)
+
+    assert output_format[0] == "*Derivative t = t"
+    assert output_format[1] == "*Opt t = t"
+    assert output_format[2] == "*Opt-Rules t s t = t"
+    assert output_format[3] == "DerivOpt t = t"
+
+

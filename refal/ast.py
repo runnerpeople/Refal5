@@ -14,6 +14,7 @@ class AST(object):
         if not is_file_type:
             # Для доступности default-функций:
             default_functions = [Extern(name) for name in DEFAULT_FUNCTIONS]
+            # default_functions = []
             self.functions = [*default_functions, *functions]
         else:
             self.functions = functions
@@ -96,17 +97,16 @@ class Sentence(object):
                and self.result == other.result \
                and self.block == other.block
 
-
     def __str__(self):
-        result_str = str(self.pattern)
+        result_str = "\t" + str(self.pattern)
         if self.conditions:
-            result_str += (", " + ",\n".join(list(map(str, self.conditions))))
-        if self.conditions or self.block:
+            result_str += (", " + ",\t".join(list(map(str, self.conditions[::-1]))))
+        if self.block:
             result_str += (", " + str(self.result))
         if self.block:
-            result_str += (": {" + ";\n".join(list(map(str, self.block))) + "}")
-        if self.result is not None and not self.conditions and not self.block:
-            result_str += ("= " + str(self.result))
+            result_str += (" :\n\t{\n\t\t" + ";\n\t\t".join(list(map(str, self.block))) + ";\n\t}")
+        if self.result is not None and not self.block:
+            result_str += (" = " + str(self.result))
         return result_str
 
 

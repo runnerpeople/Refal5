@@ -1,0 +1,63 @@
+*$MST_FROM_ENTRY;
+*$MATCHING ForRepeatedSpecialization;
+*$BASIC_CONFIGURATIONS All-confirmed-by-parameters-renaming;
+*$TRANSIENT Yes;
+
+/*
+  t.Expr ::=
+      X
+    | s.NUMBER
+    | (t.Expr '+' t.Expr)
+    | (t.Expr '*' t.Expr)
+
+  <Derivative t.Expr> == t.Expr
+  <Opt t.Expr> == t.Expr
+  <DerivOpt t.Expr> == t.Expr
+*/
+
+Derivative {
+  X = 1;
+  s.Number = 0;
+  (t.X '+' t.Y) = (<Derivative t.X> '+' <Derivative t.Y>);
+  (t.X '*' t.Y) =
+    (
+      (<Derivative t.X> '*' t.Y)
+      '+'
+      (t.X '*' <Derivative t.Y>)
+    );
+}
+
+Opt {
+  s.Value = s.Value;
+  (t.X s.Op t.Y) = <Opt-Rules <Opt t.X> s.Op <Opt t.Y>>;
+}
+
+Opt-Rules {
+  t.X '+' 0 = t.X;
+  0 '+' t.Y = t.Y;
+
+  t.X '*' 0 = 0;
+  0 '*' t.Y = 0;
+  t.X '*' 1 = t.X;
+  1 '*' t.Y = t.Y;
+
+  t.X s.Op t.Y = (t.X s.Op t.Y);
+}
+
+$ENTRY DerivOpt {
+  t.Expr = <Opt <Derivative t.Expr>>;
+}
+
+/*
+$ENTRY DerivOpt {
+  X = 1;
+  s.Number = 0;
+  (t.X '+' t.Y) = <Opt-Rules <DerivOpt t.X> '+' <DerivOpt t.Y>>;
+  (t.X '*' t.Y) =
+    <Opt-Rules
+      <Opt-Rules <DerivOpt t.X> '*' <Opt t.Y>>
+      '+'
+      <Opt-Rules <Opt t.X> '+' <DerivOpt t.Y>>
+    >;
+}
+*/

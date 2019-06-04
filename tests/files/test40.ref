@@ -1,0 +1,10 @@
+F {
+    (e.X) (e.Y)
+    , <G e.X> : e.Z
+    , e.X e.Y : s.X s.Y s.Z
+    = e.X e.Z e.Y ;
+}
+
+G {
+    s.X e.Y = s.X ;
+}
