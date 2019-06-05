@@ -168,7 +168,7 @@ def test_15(built_in_parser, capsys):
 
     captured = capsys.readouterr()
     output = re.sub(r'\.[\d]+', '', captured.err)
-    assert output == "Function F, sentence 0, there isn't solution for equation: A A e : in[F] <=> A\n"
+    assert output == "Function F, sentence 0, there isn't solution for equation: A A e : in[F] => A\n"
 
 
 def ttest_17(built_in_parser):
@@ -366,7 +366,7 @@ def ttest_23(built_in_parser):
     assert output_format[15] == "CallBrackets e = '<' e '>'"
     assert output_format[16] == "TextFromExpr e = e"
     assert output_format[17] == "*TextFromExpr-Char e = s e"
-    # assert output_format[18] == "TextFromTerm (s e) = e"
+    assert output_format[18] == "*TextFromTerm (s e) = e"
     assert output_format[19] == "EscapeChar s = s e"
     assert output_format[20] == "*EscapeChar-Aux s s = s e"
     assert output_format[21] == "*EscapeChar-SwCompare s s s s = s e"
@@ -388,7 +388,7 @@ def test_25(built_in_parser, capsys):
 
     captured = capsys.readouterr()
     output = re.sub(r'\.[\d]+', '', captured.err)
-    assert output == "Function F, sentence 0, there isn't solution for equation: 'a' () 'z' 'z' 'z' 'z' : in[F] <=> s s () e\n"
+    assert output == "Function F, sentence 0, there isn't solution for equation: 'a' () 'z' 'z' 'z' 'z' : in[F] => s s () e\n"
 
 
 @pytest.mark.timeout(1)
