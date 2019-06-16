@@ -81,11 +81,13 @@ class DefinitionType(Function):
 
 class Sentence(object):
 
-    def __init__(self, pattern, conditions, result, block):
+    def __init__(self, pattern, conditions, result, block, pos=None):
         self.pattern = pattern
         self.conditions = conditions
         self.result = result
         self.block = block
+
+        self.pos = pos
 
         self.has_call = False
         self.no_substitution = False

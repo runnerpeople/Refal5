@@ -1,1 +1,3 @@
 include README.md LICENSE
+include refal/*.type
+include tests/files/*.type tests/files/*.ref

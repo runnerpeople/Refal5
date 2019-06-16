@@ -47,7 +47,7 @@ def run_easy_test(name_file, built_in_parser, contain_file_type=False):
 
 
 @pytest.mark.timeout(1)
-def test_1(built_in_parser):
+def r_1(built_in_parser):
     output_format = run_easy_test("test1.ref", built_in_parser)
 
     assert output_format[0] == "*Trans-line e = e"
@@ -57,14 +57,14 @@ def test_1(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_3(built_in_parser):
+def r_3(built_in_parser):
     output_format = run_easy_test("test3.ref", built_in_parser)
 
     assert output_format[0] == "*F s e = s"
 
 
 @pytest.mark.timeout(10)
-def test_4(built_in_parser):
+def r_4(built_in_parser):
     output_format = run_easy_test("test4.ref", built_in_parser)
 
     assert output_format[0] == "Go  = "
@@ -77,7 +77,7 @@ def test_4(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_5(built_in_parser):
+def r_5(built_in_parser):
     output_format = run_easy_test("test5.ref", built_in_parser)
 
     assert output_format[0] == "Go  = "
@@ -92,7 +92,7 @@ def test_5(built_in_parser):
 
 
 @pytest.mark.timeout(60)
-def ttest_6(built_in_parser):
+def t_6(built_in_parser):
     output_format = run_easy_test("test6.ref", built_in_parser)
 
     assert output_format[0] == "Go  = "
@@ -105,7 +105,7 @@ def ttest_6(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_7(built_in_parser):
+def r_7(built_in_parser):
     output_format = run_easy_test("test7.ref", built_in_parser)
 
     assert output_format[0] == "Go  = "
@@ -114,14 +114,14 @@ def test_7(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_8(built_in_parser):
+def r_8(built_in_parser):
     output_format = run_easy_test("test8.ref", built_in_parser)
 
     assert output_format[0] == "*DoHexDigit s e s = e"
 
 
 @pytest.mark.timeout(1)
-def test_10(built_in_parser):
+def r_10(built_in_parser):
     output_format = run_easy_test("test10.ref", built_in_parser)
 
     assert output_format[0] == "*F s e (e) = s e"
@@ -130,7 +130,7 @@ def test_10(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_11(built_in_parser):
+def r_11(built_in_parser):
     output_format = run_easy_test("test11.ref", built_in_parser)
 
     assert output_format[0] == "*Job e = e"
@@ -142,36 +142,36 @@ def test_11(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_12(built_in_parser):
+def r_12(built_in_parser):
     output_format = run_easy_test("test12.ref", built_in_parser)
 
     assert output_format[0] == "*F @ = @"
 
 
 @pytest.mark.timeout(1)
-def test_13(built_in_parser):
+def r_13(built_in_parser):
     output_format = run_easy_test("test13.ref", built_in_parser)
 
     assert output_format[0] == "*Fab (e) e = e"
 
 
 @pytest.mark.timeout(1)
-def test_14(built_in_parser):
-    output_format = run_easy_test("test14.ref", built_in_parser, True)
+def r_14(built_in_parser):
+    output_format = run_easy_test("test14.ref", built_in_parser)
 
     assert output_format[0] == "*F A e = A"
 
 
 @pytest.mark.timeout(1)
-def test_15(built_in_parser, capsys):
+def r_15(built_in_parser, capsys):
     _ = run_easy_test("test15.ref", built_in_parser)
 
     captured = capsys.readouterr()
     output = re.sub(r'\.[\d]+', '', captured.err)
-    assert output == "Function F, sentence 0, there isn't solution for equation: A A e : in[F] => A\n"
+    assert output == "(2,3)-(2,28) Function F, sentence 0, there isn't solution for equation => A A e : A\n"
 
 
-def ttest_17(built_in_parser):
+def t_17(built_in_parser):
     output_format = run_easy_test("test17.ref", built_in_parser)
 
     assert output_format[0] == "Apply t e = e"
@@ -196,7 +196,7 @@ def ttest_17(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_18(built_in_parser):
+def r_18(built_in_parser):
     output_format = run_easy_test("test18.ref", built_in_parser, True)
 
     assert output_format[0] == "generator_GenSentence t = () ('  ' s s s s e) e"
@@ -205,7 +205,7 @@ def test_18(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_19(built_in_parser):
+def r_19(built_in_parser):
     output_format = run_easy_test("test19.ref", built_in_parser)
 
     assert output_format[0] == "refal05c_WriteError e ((s s) e) = "
@@ -213,96 +213,98 @@ def test_19(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_20(built_in_parser):
+def r_20(built_in_parser):
     output_format = run_easy_test("test20.ref", built_in_parser, True)
 
     assert output_format[0] == "refal05c_ProcessEachSource (s e) = e t"
     assert output_format[1] == "*CompileSource-SwSuccessedParse (e) (e) s e = e t"
 
 
-def te_21(built_in_parser):
+def test_21(built_in_parser):
     output_format = run_easy_test("test21.ref", built_in_parser, True)
 
     assert output_format[0] == "R05-Generate-ToFile (e) e = "
     assert output_format[1] == "R05-Generate-ToLines e = e"
-    assert output_format[2] == "Generate (e) e = e"
-    assert output_format[3] == "R05-Generate-Aux (e) (e) e = e"
+    assert output_format[2] == "*Generate (e) e = e"
+    assert output_format[3] == "*R05-Generate-Aux (e) (e) e = e"
     assert output_format[4] == "generator_GenTreeItem (e) (s e) = (e) e"
-    assert output_format[5] == "TextFromScopeClass s = e"
-    assert output_format[6] == "GenDeclaration s e = (s s s s s s ' struct r05_function r05f_' e ';')"
-    assert output_format[7] == "GenFunction s (e) s e = (e s s s s) (e) e"
-    assert output_format[8] == "GenFunctionBody s e = (s e s) e"
-    assert output_format[9] == "AddFailCommand e = e t"
+    assert output_format[5] == "*TextFromScopeClass s = e"
+    assert output_format[6] == "*GenDeclaration s e = (s s s s s s ' struct r05_function r05f_' e ';')"
+    assert output_format[7] == "*GenFunction s (e) s e = (e s s s s) (e) e"
+    assert output_format[8] == "*GenFunctionBody s e = (s e s) e"
+    assert output_format[9] == "*AddFailCommand e = e t"
     assert output_format[10] == "generator_GenSentence t = () ('  ' s s s s e) e"
-    assert output_format[11] == "SkipIndentAccum ('    ') e = e"
-    assert output_format[12] == "RangeVar-B s = 'bb[' e ']'"
-    assert output_format[13] == "RangeVar-E s = 'be[' e ']'"
-    assert output_format[14] == "RangeVarsPtr s = 'bb+' e"
-    assert output_format[15] == "SafeComment e = e"
-    assert output_format[16] == "generator_GenCommand (e) (s e) = (e) e"
-    assert output_format[17] == "CmdComment (e) e = (e ' */')"
-    assert output_format[18] == "CmdDeclareVar (e) s s e = (e ';') e"
-    assert output_format[19] == "CmdRangeArray (e) s = (e '] = { 0 };') (e '] = { 0 };')"
-    assert output_format[20] == "CmdInitB0 (e) = (e ', arg_begin, arg_end);')"
-    assert output_format[21] == "CmdMatch (e) s s s e = (e '))') (e '  continue;')"
-    assert output_format[22] == "MatchFunc s s e = s s s s e"
-    assert output_format[23] == "SymbolFunc s = s s s s e"
-    assert output_format[24] == "StrFromDirection s = s s s e 't'"
-    assert output_format[25] == "MatchArgs s s e = e"
-    assert output_format[26] == "SymbolTextRep s t e = e"
-    assert output_format[27] == "CmdEmpty (e) s = (e ']))') (e '  continue;')"
-    assert output_format[28] == "CmdClosedE (e) s 'e' e = (e '];') (e '];')"
-    assert output_format[29] == "CmdOpenedE-Start (e) s 'e' e = (e ' = 0;') (e ' = 0;') (e 'r05_start_e_loop();') (e " \
+    assert output_format[11] == "*SkipIndentAccum ('    ') e = e"
+    assert output_format[12] == "*RangeVar-B s = 'bb[' e ']'"
+    assert output_format[13] == "*RangeVar-E s = 'be[' e ']'"
+    assert output_format[14] == "*RangeVars s = 'bb[' e ']'"
+    assert output_format[15] == "*RangeVarsPtr s = 'bb+' e"
+    assert output_format[16] == "*SafeComment e = e"
+    assert output_format[17] == "generator_GenCommand (e) (s e) = (e) e"
+    assert output_format[18] == "*CmdComment (e) e = (e ' */')"
+    assert output_format[19] == "*CmdDeclareVar (e) s s e = (e ';') e"
+    assert output_format[20] == "*CmdRangeArray (e) s = (e '] = { 0 };') (e '] = { 0 };')"
+    assert output_format[21] == "*CmdInitB0 (e) = (e ', arg_begin, arg_end);')"
+    assert output_format[22] == "*CmdMatch (e) s s s e = (e '))') (e '  continue;')"
+    assert output_format[23] == "*MatchFunc s s e = s s s s e"
+    assert output_format[24] == "*SymbolFunc s = s s s s e"
+    assert output_format[25] == "*StrFromDirection s = s s s e 't'"
+    assert output_format[26] == "*MatchArgs s s e = e"
+    assert output_format[27] == "*SymbolTextRep s t e = e"
+    assert output_format[28] == "*CmdEmpty (e) s = (e ']))') (e '  continue;')"
+    assert output_format[29] == "*CmdClosedE (e) s 'e' e = (e '];') (e '];')"
+    assert output_format[30] == "*CmdOpenedE-Start (e) s 'e' e = (e ' = 0;') (e ' = 0;') (e 'r05_start_e_loop();') (e " \
                                 "'do {')"
-    assert output_format[30] == "CmdOpenedE-End (e) s 'e' e = (e '));') (e 'r05_stop_e_loop();')"
-    assert output_format[31] == "CmdSave (e) s s = (e '];') (e '];')"
-    assert output_format[32] == "CmdEmptyResult (e) = () (e 'r05_reset_allocator();')"
-    assert output_format[33] == "CmdResultArray (e) s = (e '] = { 0 };')"
-    assert output_format[34] == "CmdAllocateElem (e) s e = (e)"
-    assert output_format[35] == "ElSymbol s t e = s s s s e ');'"
-    assert output_format[36] == "ElString s e = 'chars(\"' e ');'"
-    assert output_format[37] == "ElOpenBracket s = 'open_bracket(n+' e ');'"
-    assert output_format[38] == "ElCloseBracket s = 'close_bracket(n+' e ');'"
-    assert output_format[39] == "ElOpenCall s = 'open_call(n+' e ');'"
-    assert output_format[40] == "ElCloseCall s = 'close_call(n+' e ');'"
-    assert output_format[41] == "ElSavePos s = 'insert_pos(n+' e ');'"
-    assert output_format[42] == "ElVariable s e = s 'var(' s e ');'"
-    assert output_format[43] == "CmdLinkBrackets (e) s s = (e ']);')"
-    assert output_format[44] == "CmdPushStack (e) s = (e ']);')"
-    assert output_format[45] == "CmdInsertVar (e) s s s e = (e ');')"
-    assert output_format[46] == "CmdReturnResult (e) = (e 'r05_splice_from_freelist(arg_begin);') (e " \
+    assert output_format[31] == "*CmdOpenedE-End (e) s 'e' e = (e '));') (e 'r05_stop_e_loop();')"
+    assert output_format[32] == "*CmdSave (e) s s = (e '];') (e '];')"
+    assert output_format[33] == "*CmdEmptyResult (e) = () (e 'r05_reset_allocator();')"
+    assert output_format[34] == "*CmdResultArray (e) s = (e '] = { 0 };')"
+    assert output_format[35] == "*CmdAllocateElem (e) s e = (e)"
+    assert output_format[36] == "*ElSymbol s t e = s s s s e ');'"
+    assert output_format[37] == "*ElString s e = 'chars(\"' e ');'"
+    assert output_format[38] == "*ElOpenBracket s = 'open_bracket(n+' e ');'"
+    assert output_format[39] == "*ElCloseBracket s = 'close_bracket(n+' e ');'"
+    assert output_format[40] == "*ElOpenCall s = 'open_call(n+' e ');'"
+    assert output_format[41] == "*ElCloseCall s = 'close_call(n+' e ');'"
+    assert output_format[42] == "*ElSavePos s = 'insert_pos(n+' e ');'"
+    assert output_format[43] == "*ElVariable s e = s 'var(' s e ');'"
+    assert output_format[44] == "*CmdLinkBrackets (e) s s = (e ']);')"
+    assert output_format[45] == "*CmdPushStack (e) s = (e ']);')"
+    assert output_format[46] == "*CmdInsertVar (e) s s s e = (e ');')"
+    assert output_format[47] == "*CmdReturnResult (e) = (e 'r05_splice_from_freelist(arg_begin);') (e " \
                                 "'r05_splice_to_freelist(arg_begin, arg_end);') (e 'return;')"
-    assert output_format[47] == "EscapeString e = e"
-    assert output_format[48] == "EscapeChar s = s e"
-    assert output_format[49] == "EscapeChar-Aux s s = s e"
-    assert output_format[50] == "EscapeChar-SwCompare s s s s = s e"
-    assert output_format[51] == "Var s s e = s e"
-    assert output_format[52] == "VarPtr s s e = '&' s e"
-    assert output_format[53] == "EVar-B s 'e' e = 'e' e"
-    assert output_format[54] == "EVar-E s 'e' e = 'e' e"
-    assert output_format[55] == "Elem s = 'n[' e ']'"
-    assert output_format[56] == "ElemPtr s = 'n+' e"
-    assert output_format[57] == "GenNative (e s) e = (BeginNative e s) e (EndNative)"
-    assert output_format[58] == "GenPostprocess (e) e = e"
-    assert output_format[59] == "generator_EnumerateLines (e) s (e) = s (e)"
-    assert output_format[60] == "LineDirective s e = ('#line ' e '\"')"
-    assert output_format[61] == "CompileSentence (e) (e) = e"
-    assert output_format[62] == "CompileSentence-Aux s (e) (e) e = e"
-    assert output_format[63] == "GenPattern e = s (e) (e)"
-    assert output_format[64] == "DoGenPattern s e (e) (e) = s (e) (e)"
-    assert output_format[65] == "SaveRanges s (e) (e) (e) e = s e (e) (e)"
-    assert output_format[66] == "GenResult (e) e = s (e) (e)"
-    assert output_format[67] == "DecUsings s s e = e"
-    assert output_format[68] == "ComposeSentenceCommands s (e) (e) s (e) (e) = e"
-    assert output_format[69] == "FilterCommonVarsAndPatternCommands (e) (e) e = (e) e"
-    assert output_format[70] == "ComposeSentenceCommands-Aux s s (e) (e) e = e"
+    assert output_format[48] == "*EscapeString e = e"
+    assert output_format[49] == "*EscapeChar s = s e"
+    assert output_format[50] == "*EscapeChar-Aux s s = s e"
+    assert output_format[51] == "*EscapeChar-SwCompare s s s s = s e"
+    assert output_format[52] == "*Var s s e = s e"
+    assert output_format[53] == "*VarPtr s s e = '&' s e"
+    assert output_format[54] == "*EVar-B s 'e' e = 'e' e"
+    assert output_format[55] == "*EVar-E s 'e' e = 'e' e"
+    assert output_format[56] == "*Elem s = 'n[' e ']'"
+    assert output_format[57] == "*ElemPtr s = 'n+' e"
+    assert output_format[58] == "*GenNative (e s) e = (BeginNative e s) e (EndNative)"
+    assert output_format[59] == "*GenPostprocess (e) e = e"
+    assert output_format[60] == "generator_EnumerateLines (e) s (e) = s (e)"
+    assert output_format[61] == "*LineDirective s e = ('#line ' e '\"')"
+    assert output_format[62] == "*CompileSentence (e) (e) = e"
+    assert output_format[63] == "*CompileSentence-Aux s (e) (e) e = e"
+    assert output_format[64] == "*GenPattern e = s (e) (e)"
+    assert output_format[65] == "*GenResult (e) e = s (e) (e)"
+    assert output_format[66] == "*DoGenResult (e) (e) (e) s e = s (e) (e)"
+    assert output_format[67] == "*DecUsings s s e = e"
+    assert output_format[68] == "*ComposeSentenceCommands s (e) (e) s (e) (e) = e"
+    assert output_format[69] == "*FilterCommonVarsAndPatternCommands (e) (e) e = (e) e"
+    assert output_format[70] == "*ComposeSentenceCommands-Aux s s (e) (e) e = e"
     assert output_format[71] == "generator_MakeDeclaration (s s e) = (CmdDeclareVar s s e) e"
-    assert output_format[72] == "MakeDeclaration-Aux s s e = e"
-    assert output_format[73] == "MakeCmdResultCommand s = e"
-    assert output_format[74] == "GenerateResult-OpenELoops e = e"
+    assert output_format[72] == "*MakeDeclaration-Aux s s e = e"
+    assert output_format[73] == "*MakeCmdResultCommand s = e"
+    assert output_format[74] == "*GenerateResult-OpenELoops e = e"
+    # assert output_format[75] == "*DoGenPattern s e (e) (e) = s (e) (e)"
+    # assert output_format[76] == "*SaveRanges s (e) (e) e (e) = s e (e) (e)"
 
 
-def ttest_22(built_in_parser):
+def t_22(built_in_parser):
     output_format = run_easy_test("test22.ref", built_in_parser, True)
 
     assert output_format[0] == "R05-Parse-File e = s e"
@@ -345,7 +347,7 @@ def ttest_22(built_in_parser):
     assert output_format[37] == "EL-Destroy (ErrorList e) = e"
 
 
-def ttest_23(built_in_parser):
+def r_23(built_in_parser):
     output_format = run_easy_test("test23.ref", built_in_parser)
 
     assert output_format[0] == "R05-TextFromTree e = e"
@@ -374,7 +376,7 @@ def ttest_23(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_24(built_in_parser):
+def r_24(built_in_parser):
     output_format = run_easy_test("test24.ref", built_in_parser)
 
     assert output_format[0] == "*F s s s s = s"
@@ -383,16 +385,16 @@ def test_24(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_25(built_in_parser, capsys):
+def r_25(built_in_parser, capsys):
     _ = run_easy_test("test25.ref", built_in_parser)
 
     captured = capsys.readouterr()
     output = re.sub(r'\.[\d]+', '', captured.err)
-    assert output == "Function F, sentence 0, there isn't solution for equation: 'a' () 'z' 'z' 'z' 'z' : in[F] => s s () e\n"
+    assert output == "(1,13)-(1,33) Function F, sentence 0, there isn't solution for equation => 'a' () 'z' 'z' 'z' 'z' : s s () e\n"
 
 
 @pytest.mark.timeout(1)
-def test_26(built_in_parser):
+def r_26(built_in_parser):
     output_format = run_easy_test("test26.ref", built_in_parser)
 
     assert output_format[0] == "*EL-Create  = (ErrorList)"
@@ -403,7 +405,7 @@ def test_26(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_27(built_in_parser):
+def r_27(built_in_parser):
     output_format = run_easy_test("test27.ref", built_in_parser)
 
     assert output_format[0] == "*F  = 1 2 3"
@@ -412,7 +414,7 @@ def test_27(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_28(built_in_parser):
+def r_28(built_in_parser):
     output_format = run_easy_test("test28.ref", built_in_parser)
 
     assert output_format[0] == "*F e s = "
@@ -421,7 +423,7 @@ def test_28(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_29(built_in_parser):
+def r_29(built_in_parser):
     output_format = run_easy_test("test29.ref", built_in_parser)
 
     assert output_format[0] == "*F t = "
@@ -430,7 +432,7 @@ def test_29(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_30(built_in_parser):
+def r_30(built_in_parser):
     output_format = run_easy_test("test30.ref", built_in_parser)
 
     assert output_format[0] == "*G (e) e = e"
@@ -438,7 +440,7 @@ def test_30(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_31(built_in_parser):
+def r_31(built_in_parser):
     output_format = run_easy_test("test31.ref", built_in_parser)
 
     assert output_format[0] == "*G (e) e = e"
@@ -446,7 +448,7 @@ def test_31(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_32(built_in_parser):
+def r_32(built_in_parser):
     output_format = run_easy_test("test32.ref", built_in_parser)
 
     assert output_format[0] == "*F t e = t"
@@ -455,7 +457,7 @@ def test_32(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_33(built_in_parser):
+def r_33(built_in_parser):
     output_format = run_easy_test("test33.ref", built_in_parser)
 
     assert output_format[0] == "*F (((t))) = "
@@ -464,7 +466,7 @@ def test_33(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_34(built_in_parser):
+def r_34(built_in_parser):
     output_format = run_easy_test("test34.ref", built_in_parser)
 
     assert output_format[0] == "*F I I I e = "
@@ -473,7 +475,7 @@ def test_34(built_in_parser):
 
 
 @pytest.mark.timeout(1)
-def test_35(built_in_parser):
+def r_35(built_in_parser):
     output_format = run_easy_test("test35.ref", built_in_parser)
 
     assert output_format[0] == "*Derivative t = t"
@@ -482,3 +484,42 @@ def test_35(built_in_parser):
     assert output_format[3] == "DerivOpt t = t"
 
 
+@pytest.mark.timeout(1)
+def r_36(built_in_parser):
+    output_format = run_easy_test("test36.ref", built_in_parser)
+
+    assert output_format[0] == "*F (s s A) (s s B) = "
+    assert output_format[1] == "*G (e) (e) = "
+    assert output_format[2] == "*H (A) (B) = "
+    assert output_format[3] == "*bad "
+
+
+@pytest.mark.timeout(1)
+def r_40(built_in_parser):
+    output_format = run_easy_test("test40.ref", built_in_parser)
+
+    assert output_format[0] == "*F (s e) (e) = s s s s"
+    assert output_format[1] == "*G s e = s"
+
+
+@pytest.mark.timeout(1)
+def r_41(built_in_parser):
+    output_format = run_easy_test("test41.ref", built_in_parser)
+
+    assert output_format[0] == "*HexDigit "
+    assert output_format[1] == "*DoHexDigit s e s = e"
+
+
+@pytest.mark.timeout(1)
+def r_42(built_in_parser):
+    output_format = run_easy_test("test42.ref", built_in_parser, True)
+
+    assert output_format[0] == "*Search t t = s"
+    assert output_format[1] == "Go "
+
+
+@pytest.mark.timeout(1)
+def r_43(built_in_parser):
+    output_format = run_easy_test("test43.ref", built_in_parser)
+
+    assert output_format[0] == "*F s e = s"

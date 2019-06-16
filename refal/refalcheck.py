@@ -8,6 +8,8 @@ from refal.constants import *
 
 import sys
 import argparse
+import os
+import time
 
 
 def get_file_name(file_path):
@@ -90,7 +92,7 @@ def main():
 
     parser_refal = calculate_ast(file_refal_path)
 
-    file_type_path = "built-in.type"
+    file_type_path = os.path.join(os.path.dirname(__file__), "built-in.type")
     parser_refal_type = calculate_ast(file_type_path, True)
 
     for file in args.file_type:
@@ -105,7 +107,12 @@ def main():
 
     if not parser_refal.isError and not parser_refal_type.isError:
         calculation = Calculation(parser_refal.ast, parser_refal_type.ast)
+        if DEBUG_MODE:
+            time_start = time.time()
         calculation.calculate_system()
+        if DEBUG_MODE:
+            time_end = time.time()
+            print(time_end - time_start)
         print(calculation.print_format_function())
 
 

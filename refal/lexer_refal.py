@@ -130,7 +130,7 @@ class Lexer(object):
                 new_pos = next_or_current(new_pos)
                 s += new_pos.letter()
             return IdentToken(s, Fragment(self.cur, new_pos))
-        return IdentToken(s, Fragment(self.cur, new_pos))
+        return IdentToken(s, Fragment(self.cur, self.cur))
 
     def read_symbol(self):
         new_pos = next_or_current(self.cur)

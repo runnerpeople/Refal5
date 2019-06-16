@@ -282,8 +282,8 @@ def delete_same_assignments(assignments, substitution):
 class Calculation(object):
 
     def __init__(self, ast, ast_type):
-        self.ast = deepcopy(ast)
-        self.ast_type = deepcopy(ast_type)
+        self.ast = ast
+        self.ast_type = ast_type
 
         self.block_to_condition()
         self.numerate_variable()
@@ -296,7 +296,7 @@ class Calculation(object):
         self.default_format_function = self.prepare_default_format_function()
         self.format_function = []
 
-        self.system_result = list(dict.fromkeys(self.create_equation_result()))
+        self.system_result = list(dict.fromkeys(self.create_equation_result(self.ast)))
         self.system_condition_result, self.system_condition = self.create_equation_condition()
 
         if DEBUG_MODE:
@@ -317,25 +317,17 @@ class Calculation(object):
             for terms in term.value:
                 term_call.extend(self.get_call(terms))
             return term_call
-        elif isinstance(term, CallBrackets):
+        if isinstance(term, CallBrackets):
             term_call = [term.value]
             for terms in term.content:
                 term_call.extend(self.get_call(terms))
             return term_call
-        elif isinstance(term, Variable):
-            return []
-        else:
-            return []
+        return []
 
     def contains_call(self, term):
         if isinstance(term, StructuralBrackets):
             return any(self.contains_call(term) for term in term.value)
-        elif isinstance(term, CallBrackets):
-            return True
-        elif isinstance(term, Variable):
-            return False
-        else:
-            return False
+        return isinstance(term, CallBrackets)
 
     def get_variables(self, term):
         if isinstance(term, StructuralBrackets):
@@ -399,21 +391,24 @@ class Calculation(object):
                 for i in range(len(variables)):
                     if variables[i].value not in variable_dict:
                         variable_dict[variables[i].value] = generate_index()
-                    variables[i] = change_variable_index_and_index_sentence(variables[i], variable_dict[variables[i].value], index)
+                    variables[i] = change_variable_index_and_index_sentence(variables[i],
+                                                                            variable_dict[variables[i].value], index)
             for condition in sentence.conditions:
                 for term_condition in condition.pattern.terms:
                     variables = self.get_variables(term_condition)
                     for i in range(len(variables)):
                         if variables[i].value not in variable_dict:
                             variable_dict[variables[i].value] = generate_index()
-                        variables[i] = change_variable_index_and_index_sentence(variables[i], variable_dict[variables[i].value],
+                        variables[i] = change_variable_index_and_index_sentence(variables[i],
+                                                                                variable_dict[variables[i].value],
                                                                                 index)
                 for term_result in condition.result.terms:
                     variables = self.get_variables(term_result)
                     for i in range(len(variables)):
                         if variables[i].value not in variable_dict:
                             variable_dict[variables[i].value] = generate_index()
-                        variables[i] = change_variable_index_and_index_sentence(variables[i], variable_dict[variables[i].value],
+                        variables[i] = change_variable_index_and_index_sentence(variables[i],
+                                                                                variable_dict[variables[i].value],
                                                                                 index)
             if sentence.block:
                 self.numerate_variable_rec(sentence.block, 0, variable_dict)
@@ -422,7 +417,8 @@ class Calculation(object):
                 for i in range(len(variables)):
                     if variables[i].value not in variable_dict:
                         variable_dict[variables[i].value] = generate_index()
-                    variables[i] = change_variable_index_and_index_sentence(variables[i], variable_dict[variables[i].value], index)
+                    variables[i] = change_variable_index_and_index_sentence(variables[i],
+                                                                            variable_dict[variables[i].value], index)
 
     def numerate_variable_built_in(self, function_type):
         for term in function_type.pattern.terms:
@@ -448,11 +444,11 @@ class Calculation(object):
                 (expr.terms[-1].type_variable == Type.s or expr.terms[-1].type_variable == Type.t):
             return Expression([*self.make_hard(Expression(expr.terms[:-1])).terms, expr.terms[-1]])
         elif isinstance(expr.terms[0], StructuralBrackets):
-            return Expression([StructuralBrackets(*self.make_hard(Expression(expr.terms[0].value)).terms),
+            return Expression([StructuralBrackets([*self.make_hard(Expression(expr.terms[0].value)).terms]),
                                *self.make_hard(Expression(expr.terms[1:])).terms])
         elif isinstance(expr.terms[-1], StructuralBrackets):
             return Expression([*self.make_hard(Expression(expr.terms[:-1])).terms,
-                               StructuralBrackets(*self.make_hard(Expression(expr.terms[-1].value)).terms)])
+                               StructuralBrackets([*self.make_hard(Expression(expr.terms[-1].value)).terms])])
         elif len(expr.terms) == 1 and isinstance(expr.terms[0], Variable) and expr.terms[0].type_variable == Type.e:
             return Expression([expr.terms[0]])
         elif len(expr.terms) == 1 and isinstance(expr.terms[0], SpecialVariable) \
@@ -525,9 +521,9 @@ class Calculation(object):
                 all_equations.extend(equations)
         return all_equations, equations_conditions
 
-    def create_equation_result(self):
+    def create_equation_result(self, ast):
         all_equations = []
-        for function in self.ast.functions:
+        for function in ast.functions:
             if isinstance(function, Definition):
                 equations = []
                 for sentence in function.sentences:
@@ -609,7 +605,7 @@ class Calculation(object):
         else:
             return [], terms, False
 
-    def apply_substitution(self, expr, subst, flag=False):
+    def apply_substitution(self, expr, subst):
         res = []
         i = 0
         exprs = deepcopy(expr)
@@ -622,14 +618,12 @@ class Calculation(object):
                     if substitution.left_part == sub_expr:
                         exists_substitution = True
                         if len(substitution.left_part.terms) == 1 and isinstance(substitution.left_part.terms[0],
-                                                                                 SpecialVariable) and not flag:
-
+                                                                                 SpecialVariable):
                             res.extend(self.numerate_variable_function(
-                                self.apply_substitution(substitution.right_part, subst, flag).terms
+                                self.apply_substitution(substitution.right_part, subst).terms
                             ))
-
                         else:
-                            res.extend(self.apply_substitution(substitution.right_part, subst, flag).terms)
+                            res.extend(self.apply_substitution(substitution.right_part, subst).terms)
                         del exprs.terms[i:j]
                         break
                 if exists_substitution:
@@ -646,14 +640,14 @@ class Calculation(object):
                         exists_substitution = True
                         if isinstance(substitution.left_part.terms[0], SpecialVariable):
                             res.extend(self.numerate_variable_function(
-                                self.apply_substitution(substitution.right_part, subst, flag).terms
+                                self.apply_substitution(substitution.right_part, subst).terms
                             ))
                         else:
-                            res.extend(self.apply_substitution(substitution.right_part, subst, flag).terms)
+                            res.extend(self.apply_substitution(substitution.right_part, subst).terms)
                 if not exists_substitution:
                     res.append(exprs.terms[i])
             elif isinstance(exprs.terms[i], StructuralBrackets):
-                res.extend([StructuralBrackets(self.apply_substitution(Expression(exprs.terms[i].value), subst, flag).terms)])
+                res.extend([StructuralBrackets(self.apply_substitution(Expression(exprs.terms[i].value), subst).terms)])
             else:
                 res.append(exprs.terms[i])
             i += 1
@@ -699,18 +693,13 @@ class Calculation(object):
                                    format_function.left_part.terms[0].type_variable != SpecialType.none]
         return format_functions_result
 
-    def calculate_equation(self, system, ast):
-        substitutions = []
-        assignments = []
+    def calculate_equation(self, substitutions_copy, assignments_copy, system, ast):
+        substitutions = deepcopy(substitutions_copy)
+        assignments = deepcopy(assignments_copy)
         k = 0
 
         while k < len(system):
             eq = deepcopy(system[k])
-
-            eq.left_part = self.apply_substitution(eq.left_part, [*substitutions, *self.format_function,
-                                                                  *self.default_format_function])
-            eq.right_part = self.apply_substitution(eq.right_part, [*substitutions, *self.format_function,
-                                                                    *self.default_format_function])
 
             if not (len(eq.right_part.terms) > 0 and
                     any(isinstance(term, SpecialVariable) and term.type_variable == SpecialType.none
@@ -718,19 +707,49 @@ class Calculation(object):
                     and not (len(eq.left_part.terms) > 0 and
                              any(isinstance(term, SpecialVariable) and term.type_variable == SpecialType.none
                                  for term in eq.left_part.terms)):
-                status, substitution, assignment, _, _ = self.match_equation(eq, substitutions, assignments,
+                if has_alternative(substitutions):
+                    status, substitution, assignment, k = self.calculate_alternative_system(system,
+                                                                                            substitutions,
+                                                                                            assignments,
+                                                                                            k,
+                                                                                            ast)
+                    if status != "Failure":
+                        substitution = [subst for subst in substitution if not subst.left_part == subst.right_part]
+                        assignment = [assign for assign in assignment if not assign.left_part == assign.right_part]
+
+                        for subst in substitution:
+                            if subst not in substitutions:
+                                substitutions.append(subst)
+
+                        for assign in assignment:
+                            if assign not in assignments:
+                                assignments.append(assign)
+                else:
+                    status, substitution, assignment, _, _ = self.match_equation(eq, substitutions, assignments,
                                                                              system)
 
                 assignment, substitution = delete_same_assignments(assignment, substitution)
 
                 if has_alternative(substitution):
                     status, substitution_result, assignments_result, k = self.calculate_alternative_system(system,
-                                                                                                        substitution,
-                                                                                                        assignment,
-                                                                                                        system[k], k,
-                                                                                                        ast)
+                                                                                                           substitution,
+                                                                                                           assignment,
+                                                                                                           k,
+                                                                                                           ast)
+                    if status != "Failure":
+                        substitution_result = [subst for subst in substitution_result if
+                                               not subst.left_part == subst.right_part]
+                        assignments_result = [assign for assign in assignments_result if
+                                              not assign.left_part == assign.right_part]
 
-                if status != "Failure":
+                        for subst in substitution_result:
+                            if subst not in substitutions:
+                                substitutions.append(subst)
+
+                        for assign in assignments_result:
+                            if assign not in assignments:
+                                assignments.append(assign)
+                elif status != "Failure":
                     substitution = [subst for subst in substitution if not subst.left_part == subst.right_part]
                     assignment = [assign for assign in assignment if not assign.left_part == assign.right_part]
 
@@ -743,36 +762,38 @@ class Calculation(object):
                             assignments.append(assign)
 
                 if status == "Failure":
-                    error_message = "Function %s, sentence %d, there isn't solution for equation: %s" % (
-                        system[k].func_name, system[k].index_sentence, self.print_equation(system[k]))
+                    error_message = "%s Function %s, sentence %d, there isn't solution for equation => %s\n" % (
+                        str(eq.sentence.pos),
+                        eq.func_name,
+                        eq.index_sentence,
+                        self.print_equation(eq))
 
                     if not any(msg.startswith(error_message) for msg in self.error_messages):
-                        substitution = self.apply_substitution(system[k].right_part,
-                                                               [*substitution,
-                                                                *substitutions,
-                                                                *self.format_function,
-                                                                *self.default_format_function])
-
-                        error_message = error_message + " => " + self.print_expr(substitution) + "\n"
                         self.error_messages.append(error_message)
+
+                    eq.sentence.pattern = self.apply_substitution(eq.sentence.pattern, substitutions_copy)
+                    eq.sentence.pattern = self.apply_assignment(eq.sentence.pattern, assignments)
 
                     for function in ast.functions:
                         if isinstance(function, Definition):
                             for sentence in function.sentences:
-                                if system[k].sentence == sentence:
+                                if eq.sentence.pattern == sentence.pattern:
                                     sentence.no_substitution = True
 
             else:
+                eq.left_part = self.apply_substitution(eq.left_part, substitutions)
+                eq.right_part = self.apply_substitution(eq.right_part, substitutions)
                 substitution = [Substitution(eq.left_part, eq.right_part)]
                 substitution = [subst for subst in substitution if not subst.left_part == subst.right_part]
 
                 for subst in substitution:
                     if subst not in substitutions:
                         substitutions.append(subst)
+
             k += 1
         return substitutions, assignments
 
-    def calculate_alternative_system(self, system, substitutions, assignments, equation, j, ast):
+    def calculate_alternative_system(self, system, substitutions, assignments, j, ast):
         substitution_alternative = get_alternative_substitution(substitutions)
 
         if DEBUG_MODE:
@@ -785,28 +806,63 @@ class Calculation(object):
         substitution_first_variant = Substitution(substitution_alternative.left_part,
                                                   substitution_alternative.right_part)
 
-        status_first, substitutions_first, assignments_first, index_first = self.calculate_alternative_system_rec(system,
-                                                                                                     [
-                                                                                                         substitution_first_variant,
-                                                                                                         *substitutions],
-                                                                                                     assignments, j,
-                                                                                                     ast)
+        substitutions_copy = deepcopy(substitutions)
+        status_first, substitutions_first, assignments_first, index_first = None, [], [], 0
+        if has_alternative(substitutions_copy):
+            while has_alternative(substitutions_copy):
+                status, substitution, assignment, index_first = self.calculate_alternative_system(system,
+                                                                                                    [*substitutions_copy,
+                                                                                                        substitution_first_variant],
+                                                                                                        assignments,
+                                                                                                        j,
+                                                                                                    ast)
+                status_first = status
+                if status != "Failure":
+                    substitutions_first = substitution
+                    assignments_first = assignment
+                substitutions_copy.remove(get_alternative_substitution(substitutions_copy))
+        else:
+
+            status_first, substitutions_first, assignments_first, index_first = self.calculate_alternative_system_rec(
+                system,
+                [
+                    substitution_first_variant,
+                    *substitutions],
+                assignments, j,
+                ast)
 
         substitution_second_variant = Substitution(substitution_alternative.left_part,
                                                    substitution_alternative.alternative_right_part)
 
-        status_second, substitutions_second, assignments_second, index_second = self.calculate_alternative_system_rec(system,
-                                                                                                        [
-                                                                                                            substitution_second_variant,
-                                                                                                            *substitutions],
-                                                                                                        assignments, j,
-                                                                                                        ast)
+        status_second, substitutions_second, assignments_second, index_second = None, [], [], 0
+        if has_alternative(substitutions):
+            while has_alternative(substitutions):
+                status, substitution, assignment, index = self.calculate_alternative_system(system,
+                                                                                                           [*substitutions,
+                                                                                                            substitution_second_variant],
+                                                                                                           assignments,
+                                                                                                           j,
+                                                                                                           ast)
+                status_second = status
+                if status != "Failure":
+                    substitutions_second = substitution
+                    assignments_second = assignment
+                substitutions.remove(get_alternative_substitution(substitutions))
+        else:
+            status_second, substitutions_second, assignments_second, index_second = self.calculate_alternative_system_rec(
+                system,
+                [
+                    substitution_second_variant,
+                    *substitutions],
+                assignments, j,
+                ast)
+
         index_result = None
         if status_first == "Success":
             for subst in substitutions_first:
                 if subst not in substitutions:
                     substitutions.append(subst)
-            if substitutions_first not in substitutions:
+            if substitution_first_variant not in substitutions:
                 substitutions.append(substitution_first_variant)
 
             for assign in assignments_first:
@@ -819,7 +875,7 @@ class Calculation(object):
             for subst in substitutions_second:
                 if subst not in substitutions:
                     substitutions.append(subst)
-            if substitutions_second not in substitutions:
+            if substitution_second_variant not in substitutions:
                 substitutions.append(substitution_second_variant)
 
             for assign in assignments_second:
@@ -832,23 +888,20 @@ class Calculation(object):
 
             index_result = max(index_first, index_second)
 
-            error_message = "Function %s, sentence %d, there isn't solution for equation: %s" % (
-                system[index_result].func_name, system[index_result].index_sentence, self.print_equation(system[index_result]))
-
-            if not any(msg.startswith(error_message) for msg in self.error_messages):
-                substitution = self.apply_substitution(system[index_result].right_part,
-                                                       [*substitutions,
-                                                        *self.format_function,
-                                                        *self.default_format_function])
-
-                error_message = error_message + " => " + self.print_expr(substitution) + "\n"
-                self.error_messages.append(error_message)
-
-                for function in ast.functions:
-                    if isinstance(function, Definition):
-                        for sentence in function.sentences:
-                            if system[j].sentence == sentence:
-                                sentence.no_substitution = True
+            # error_message = "%s Function %s, sentence %d, there isn't solution for equation => %s\n" % (
+            #     str(system[index_result].sentence.pos),
+            #     system[index_result].func_name,
+            #     system[index_result].index_sentence,
+            #     self.print_equation(system[index_result]))
+            #
+            # if not any(msg.startswith(error_message) for msg in self.error_messages):
+            #     self.error_messages.append(error_message)
+            #
+            # for function in ast.functions:
+            #     if isinstance(function, Definition):
+            #         for sentence in function.sentences:
+            #             if system[j].sentence == sentence:
+            #                 sentence.no_substitution = True
 
             return "Failure", [], [], index_result
 
@@ -866,82 +919,77 @@ class Calculation(object):
         substitutions_copy = deepcopy(substitutions)
         assignments_copy = deepcopy(assignments)
 
-        is_first = True
-        while j < len(system):
-            eq = deepcopy(system[j])
-            eq.left_part = self.apply_substitution(eq.left_part, [*substitutions_copy,
-                                                                  *self.format_function,
-                                                                  *self.default_format_function
-                                                                  ], is_first)
-            eq.right_part = self.apply_substitution(eq.right_part,
-                                                    [*substitutions_copy,
-                                                     *self.format_function,
-                                                     *self.default_format_function
-                                                     ], is_first)
+        # while j < len(system):
+        eq = deepcopy(system[j])
+        status, substitution_result, assignments_result, _, _ = self.match_equation(eq, substitutions_copy,
+                                                                                    assignments_copy,
+                                                                                    self.system_result)
 
-            status, substitution_result, assignments_result, _, _ = self.match_equation(eq, substitutions_copy,
-                                                                                        assignments_copy,
-                                                                                        self.system_result)
+        assignments_result, substitution_result = delete_same_assignments(assignments_result, substitution_result)
 
-            assignments_result, substitution_result = delete_same_assignments(assignments_result, substitution_result)
+        if status == "Failure":
+            return status, substitutions_copy, assignments_copy, j
+
+        if has_alternative(substitution_result):
+            substitution_all = []
+            for subst in substitution_result:
+                if subst not in substitution_all:
+                    substitution_all.append(subst)
+
+            for subst in substitutions_copy:
+                if subst not in substitution_all:
+                    substitution_all.append(subst)
+
+            assignments_all = []
+            for assign in assignments_result:
+                if assign not in assignments_all:
+                    assignments_all.append(assign)
+
+            for assign in assignments_copy:
+                if assign not in assignments_all:
+                    assignments_all.append(assign)
+
+            status, substitution_alternative, assignments_alternative, index = \
+                self.calculate_alternative_system(system, substitution_all, assignments_all, j, ast)
 
             if status == "Failure":
-                return status, [], [], j
+                return status, [], [], index
 
-            if has_alternative(substitution_result):
-                substitution_all = []
-                for subst in substitution_result:
-                    if subst not in substitution_all:
-                        substitution_all.append(subst)
+            for subst in substitution_alternative:
+                if subst not in substitutions_copy:
+                    substitutions_copy.append(subst)
 
-                for subst in substitutions_copy:
-                    if subst not in substitution_all:
-                        substitution_all.append(subst)
+            for assign in assignments_alternative:
+                if assign not in assignments_copy:
+                    assignments_copy.append(assign)
 
-                assignments_all = []
-                for assign in assignments_result:
-                    if assign not in assignments_all:
-                        assignments_all.append(assign)
+            j = index
+        else:
+            substitution_result = [subst for subst in substitution_result if
+                                   not subst.left_part == subst.right_part]
 
-                for assign in assignments_copy:
-                    if assign not in assignments_all:
-                        assignments_all.append(assign)
+            assignments_result = [assign for assign in assignments_result if
+                                  not assign.left_part == assign.right_part]
 
-                status, substitution_alternative, assignments_alternative, index = \
-                    self.calculate_alternative_system(system, substitution_all, assignments_all, system[j],
-                                                      j, ast)
+            for subst in substitution_result:
+                if subst not in substitutions_copy:
+                    substitutions_copy.append(subst)
 
-                if status == "Failure":
-                    return status, [], [], index
+            for assign in assignments_result:
+                if assign not in assignments_copy:
+                    assignments_copy.append(assign)
 
-                for subst in substitution_alternative:
-                    if subst not in substitutions_copy:
-                        substitutions_copy.append(subst)
-
-                for assign in assignments_alternative:
-                    if assign not in assignments_copy:
-                        assignments_copy.append(assign)
-
-                j = index
-            else:
-                substitution_result = [subst for subst in substitution_result if
-                                       not subst.left_part == subst.right_part]
-
-                assignments_result = [assign for assign in assignments_result if
-                                      not assign.left_part == assign.right_part]
-
-                for subst in substitution_result:
-                    if subst not in substitutions_copy:
-                        substitutions_copy.append(subst)
-
-                for assign in assignments_result:
-                    if assign not in assignments_copy:
-                        assignments_copy.append(assign)
-
-            j += 1
-            is_first = False
+        # j += 1
 
         return "Success", substitutions_copy, assignments_copy, j
+
+    def substitute_to_system_format(self, system):
+        for eq in system:
+            eq.left_part = self.apply_substitution(eq.left_part,
+                                                   [*self.format_function, *self.default_format_function])
+            eq.right_part = self.apply_substitution(eq.right_part,
+                                                    [*self.format_function, *self.default_format_function])
+        return system
 
     def calculate_system(self):
         while True:
@@ -950,8 +998,13 @@ class Calculation(object):
 
             ast = deepcopy(self.ast)
 
-            if len(self.system_condition_result) > 0:
-                substitutions_condition, assignments_condition = self.calculate_equation(self.system_condition_result,
+            if len(self.system_condition_result) > 0 or len(self.system_condition) > 0:
+
+                system_condition_result = deepcopy(self.system_condition_result)
+                self.substitute_to_system_format(system_condition_result)
+
+                substitutions_condition, assignments_condition = self.calculate_equation(substitutions, assignments,
+                                                                                         system_condition_result,
                                                                                          ast)
 
                 substitutions_variant = make_alternative(substitutions_condition)
@@ -1019,16 +1072,26 @@ class Calculation(object):
                                                   sentence)
                                     self.system_condition.append(eq)
 
-                substitutions_condition, assignments_condition = self.calculate_equation(
-                    self.system_condition, ast)
-                substitutions_variant = make_alternative(substitutions_condition)
-                for substitution_var in substitutions_variant:
-                    for subst in substitutions:
-                        substitution_var.extend(subst)
+                system_condition = deepcopy(self.system_condition)
+                self.substitute_to_system_format(system_condition)
 
-                substitutions = substitutions_variant
+                if len(substitutions) > 0:
+                    j = 0
+                    substitutions_result = []
+                    while j < len(substitutions):
+                        substitutions_condition, assignments_condition = self.calculate_equation(
+                            substitutions[j], assignments, system_condition, ast)
 
-                assignments.extend(assignments_condition)
+                        substitutions_variant = make_alternative(substitutions_condition)
+                        for substitution_var in substitutions_variant:
+                            for subst in substitutions:
+                                substitution_var.extend(subst)
+
+                        substitutions_result.extend(substitutions_variant)
+                        assignments.extend(assignments_condition)
+
+                        j += 1
+                    substitutions = substitutions_result
 
             if len(self.system_result) == 0:
                 for function in ast.functions:
@@ -1118,22 +1181,37 @@ class Calculation(object):
                 for eq in self.system_result:
                     eq.sentence.no_substitution = False
 
-                    # eq.left_part = self.apply_substitution(eq.left_part,
-                    #                                        [*self.format_function, *self.default_format_function])
-                    # eq.right_part = self.apply_substitution(eq.right_part,
-                    #                                         [*self.format_function, *self.default_format_function])
+                system_result = deepcopy(self.system_result)
+                self.substitute_to_system_format(system_result)
 
-                substitutions_result, assignments_result = self.calculate_equation(
-                    self.system_result, ast)
+                if len(substitutions) > 0:
+                    j = 0
+                    substitutions_result_ = []
+                    while j < len(substitutions):
+                        substitutions_result, assignments_result = self.calculate_equation(
+                            substitutions[j], assignments, system_result, ast)
 
-                substitutions_variant = make_alternative(substitutions_result)
-                for substitution_var in substitutions_variant:
-                    for subst in substitutions:
-                        substitution_var.extend(subst)
+                        substitutions_variant = make_alternative(substitutions_result)
+                        for substitution_var in substitutions_variant:
+                            for subst in substitutions:
+                                substitution_var.extend(subst)
 
-                assignments.extend(assignments_result)
+                        substitutions_result_.extend(substitutions_variant)
+                        assignments.extend(assignments_result)
 
-                substitutions = substitutions_variant
+                        j += 1
+                    substitutions = substitutions_result_
+                else:
+                    substitutions_result, assignments_result = self.calculate_equation(
+                        [], [], system_result, ast)
+
+                    substitutions_variant = make_alternative(substitutions_result)
+                    for substitution_var in substitutions_variant:
+                        for subst in substitutions:
+                            substitution_var.extend(subst)
+
+                    assignments.extend(assignments_result)
+                    substitutions = substitutions_variant
 
                 for function in ast.functions:
                     if isinstance(function, Definition):
@@ -1230,7 +1308,10 @@ class Calculation(object):
         return True
 
     def match_equation(self, equation, substitution, assignments, system):
+        equation.left_part = self.apply_substitution(equation.left_part, substitution)
+        equation.right_part = self.apply_substitution(equation.right_part, substitution)
         eq = deepcopy(equation)
+
         if eq.left_part.terms == [] and eq.right_part.terms == []:
             return "Success", substitution, assignments, system, eq
         else:
@@ -1373,7 +1454,7 @@ class Calculation(object):
                             assignments.append(Assignment(Expression([]), Expression([term])))
                         return "Success", substitution, assignments, system, eq
 
-                    return "Undefined", [], [], system, eq
+                    return "Failure", [], [], system, eq
 
                 if len(eq.right_part.terms) == 0:
                     if all(isinstance(term, Variable) and term.type_variable == Type.e for term in
@@ -1542,4 +1623,4 @@ class Calculation(object):
         if isinstance(term, Variable):
             return term.type_variable.name
         else:
-            return term.__str__()
+            return str(term)

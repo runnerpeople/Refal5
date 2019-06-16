@@ -1,0 +1,10 @@
+Search {
+    (e.1) (e.L e.1 e.R) = T;
+    (e.1) (e.2) = F;
+}
+
+$ENTRY Go {
+    = <Search <Card2> (<Card2>)>;
+}
+
+$EXTERN Card2;

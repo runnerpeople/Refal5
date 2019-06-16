@@ -1,0 +1,55 @@
+
+$ENTRY MytoBool {
+    '+' = 'T';
+    0 = 'F';
+    '-' = 'F';
+}
+
+$ENTRY MyIfNotLess {
+    Inf s.2 = 'T';
+    s.1 s.1 = 'T';
+    s.1 Inf = 'F';
+    s.1 s.2
+    , <Type s.1> : 'N' e.other
+    , <Type s.2> : 'N' e.other2
+        = <MytoBool <Compare s.1 s.2>>;
+    '-' s.1 s.2 = 'F';
+    '-' s.1 '-' s.1 = 'T';
+    '-' s.1 '-' s.2 = <MytoBool <Compare '-' s.1 '-' s.2>>;
+    t.1 t.2 = 'F';
+}
+
+$ENTRY MyOne {
+    = 1;
+}
+
+
+DEDecreaseDim {
+    (AreEqual (e.Vars (s.X t.X)) (s.C Const))
+        =
+        <DEDecreaseDim1 <MyOne> (AreEqual ((s.X t.X) e.Vars) (s.C Const))>;
+}
+
+DEDecreaseDim1 {
+    s.XVal (AreEqual ((s.X t.X) e.Vars) (s.C Const)), 
+    <MyIfNotLess s.C s.X> : 'T' 
+        =
+        <DEDecreaseDim1 
+            <MyIfNotLess 
+                <Sub s.C s.X> 
+                s.X
+            > 
+            <Add s.XVal 1>
+            (AreEqual ((s.X t.X) e.Vars) (<Sub s.C s.X> Const))
+        >;
+    s.XVal (AreEqual ((s.X t.X) e.Vars) (s.C Const)) = ;
+}
+
+
+Zip {
+    (assign t.x e.xval) = ;
+    (assign t.x e.xval)(Case (assign t.y e.yval) e.OtherVars) e.OtherCases
+        = 
+        (Case (assign t.x e.xval) (assign t.y e.yval) e.OtherVars)
+        <Zip (assign t.x e.xval) e.OtherCases>;
+}

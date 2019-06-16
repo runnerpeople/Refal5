@@ -3,6 +3,7 @@
 
 from refal.tokens import *
 from refal.ast import *
+from refal.position import *
 
 import sys
 
@@ -78,7 +79,7 @@ class ParserRefal(object):
                     for variable in out_variables:
                         if variable not in variables:
                             sys.stderr.write(
-                                "Error. Variable %s isn't found in previous sentence" % variable)
+                                "Error. Variable %s isn't found in previous sentence\n" % variable)
                             self.isError = True
             if sentence.block:
                 self.semantics_variable(sentence.block)
@@ -107,10 +108,10 @@ class ParserRefal(object):
                                 if term.value not in names:
                                     sys.stderr.write("Error. Function %s isn't defined\n" % term.value)
                                     self.isError = True
-        if not self.isError:
-            for function in self.ast.functions:
-                if isinstance(function, Definition):
-                    self.semantics_variable(function.sentences)
+        # if not self.isError:
+        #     for function in self.ast.functions:
+        #         if isinstance(function, Definition):
+        #             self.semantics_variable(function.sentences)
 
     def parse(self):
         self.ast = AST(self.parse_program())
@@ -217,11 +218,13 @@ class ParserRefal(object):
 
     # Sentence ::= Pattern ( ('=' Result) | (',' Result ':' (Sentence | Body)) );
     def parse_sentence(self):
+        starting_pos = self.cur_token.coords
         pattern = self.parse_pattern()
         if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "=":
             self.cur_token = next(self.iteratorTokens)
             result = self.parse_result()
-            return [Sentence(pattern, [], result, [])]
+            following_pos = self.cur_token.coords
+            return [Sentence(pattern, [], result, [], Fragment(starting_pos.starting, following_pos.following))]
         elif self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == ",":
             self.cur_token = next(self.iteratorTokens)
             result = self.parse_result()
@@ -229,12 +232,14 @@ class ParserRefal(object):
                 self.cur_token = next(self.iteratorTokens)
                 if self.cur_token.tag == DomainTag.Mark_sign and self.cur_token.value == "{":
                     body = self.parse_body()
-                    return [Sentence(pattern, [], result, body)]
+                    following_pos = self.cur_token.coords
+                    return [Sentence(pattern, [], result, body, Fragment(starting_pos.starting, following_pos.following))]
                 else:
                     sentence = self.parse_sentence()[0]
+                    following_pos = self.cur_token.coords
                     return [
                         Sentence(pattern, [*sentence.conditions, Condition(result, sentence.pattern)], sentence.result,
-                                 sentence.block)]
+                                 sentence.block, Fragment(starting_pos.starting, following_pos.following))]
             else:
                 sys.stderr.write("Expected \":\" after declaring result\n")
                 self.isError = True
