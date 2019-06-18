@@ -9,11 +9,12 @@ from refal.constants import *
 
 class AST(object):
 
-    def __init__(self, functions, is_file_type=False):
+    def __init__(self, functions, is_file_type=False, default_functions=None):
 
         if not is_file_type:
             # Для доступности default-функций:
-            default_functions = [Extern(name) for name in DEFAULT_FUNCTIONS]
+            if default_functions is None:
+                default_functions = [Extern(name) for name in DEFAULT_FUNCTIONS]
             # default_functions = []
             self.functions = [*default_functions, *functions]
         else:
@@ -21,6 +22,9 @@ class AST(object):
 
     def __str__(self):
         return str("\n".join(list(map(str, self.functions))))
+
+    def clone(self):
+        return AST([function.clone() for function in self.functions if isinstance(function, Definition)], False, [])
 
 
 class Function(ABC):
@@ -36,6 +40,10 @@ class Function(ABC):
     def __str__(self):
         return self.name
 
+    @abstractmethod
+    def clone(self):
+        raise NotImplementedError("Can't clone abstract class")
+
 
 class Extern(Function):
 
@@ -47,6 +55,9 @@ class Extern(Function):
 
     def __str__(self):
         return "$EXTERN " + self.name
+
+    def clone(self):
+        return Extern(self.name, self.pos.clone())
 
 
 class Definition(Function):
@@ -64,6 +75,10 @@ class Definition(Function):
     def __str__(self):
         return self.name + " {\n" + ";\n".join(list(map(str, self.sentences))) + ";\n}"
 
+    def clone(self):
+        return Definition(self.name, self.pos.clone(), self.is_entry,
+                          [sentences.clone() for sentences in self.sentences])
+
 
 class DefinitionType(Function):
 
@@ -77,6 +92,9 @@ class DefinitionType(Function):
 
     def __str__(self):
         return self.name + " " + str(self.pattern) + " = " + str(self.result)
+
+    def clone(self):
+        return DefinitionType(self.name, self.pattern.clone(), self.result.clone(), self.pos.clone())
 
 
 class Sentence(object):
@@ -111,6 +129,14 @@ class Sentence(object):
             result_str += (" = " + str(self.result))
         return result_str
 
+    def clone(self):
+        sentence_copy = Sentence(self.pattern.clone(), [condition.clone() for condition in self.conditions],
+                                 self.result.clone(),
+                                 [block.clone() for block in self.block], self.pos.clone())
+        sentence_copy.has_call = self.has_call
+        sentence_copy.no_substitution = self.no_substitution
+        return sentence_copy
+
 
 class Condition(object):
 
@@ -120,6 +146,9 @@ class Condition(object):
 
     def __str__(self):
         return str(self.result) + " : " + str(self.pattern)
+
+    def clone(self):
+        return Condition(self.result.clone(), self.pattern.clone())
 
 
 class Expression(object):
@@ -136,6 +165,9 @@ class Expression(object):
     def __str__(self):
         return " ".join(list(map(str, self.terms)))
 
+    def clone(self):
+        return Expression([term.clone() for term in self.terms])
+
 
 class Term(ABC):
 
@@ -145,6 +177,10 @@ class Term(ABC):
     @abstractmethod
     def __str__(self):
         return str(self.value)
+
+    @abstractmethod
+    def clone(self):
+        raise NotImplementedError("Can't clone abstract class")
 
 
 class Char(Term):
@@ -158,6 +194,9 @@ class Char(Term):
     def __str__(self):
         return super(Char, self).__str__()
 
+    def clone(self):
+        return Char(self.value)
+
 
 class Macrodigit(Term):
 
@@ -169,6 +208,9 @@ class Macrodigit(Term):
 
     def __str__(self):
         return super(Macrodigit, self).__str__()
+
+    def clone(self):
+        return Macrodigit(self.value)
 
 
 class CompoundSymbol(Term):
@@ -182,6 +224,9 @@ class CompoundSymbol(Term):
     def __str__(self):
         return super(CompoundSymbol, self).__str__()
 
+    def clone(self):
+        return CompoundSymbol(self.value)
+
 
 class StructuralBrackets(Term):
 
@@ -194,6 +239,9 @@ class StructuralBrackets(Term):
     def __str__(self):
         return "(" + " ".join(list(map(str, self.value))) + ")"
 
+    def clone(self):
+        return StructuralBrackets([value.clone() for value in self.value])
+
 
 class CallBrackets(Term):
 
@@ -204,6 +252,9 @@ class CallBrackets(Term):
 
     def __str__(self):
         return "<" + self.value + " " + " ".join(list(map(str, self.content))) + ">"
+
+    def clone(self):
+        return CallBrackets(self.value, self.pos.clone(), [content.clone() for content in self.content])
 
 
 class Type(Enum):
@@ -231,3 +282,6 @@ class Variable(Term):
             return "t." + str(self.index)
         elif self.type_variable == Type.e:
             return "e." + str(self.index)
+
+    def clone(self):
+        return Variable(self.value, self.type_variable, None if self.pos is None else self.pos.clone(), self.index, self.sentence_index)

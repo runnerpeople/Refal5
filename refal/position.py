@@ -11,6 +11,14 @@ class Fragment(object):
     def __str__(self):
         return str(self.starting) + "-" + str(self.following)
 
+    def clone(self):
+        return Fragment(self.starting.clone(), self.following.clone())
+
+    def equals(self, other):
+        return isinstance(other, Fragment) \
+               and self.starting.equals(other.starting) \
+               and self.following.equals(other.following)
+
 
 class Position(object):
 
@@ -91,3 +99,9 @@ class Position(object):
 
     def has_next(self):
         return self.index < len(self.text)
+
+    def clone(self):
+        return Position(self.text, self.line, self.pos, self.index)
+
+    def equals(self, other):
+        return isinstance(other, Position) and self.index == other.index

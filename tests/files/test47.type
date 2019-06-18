@@ -1,0 +1,3 @@
+GetNodeName (t.NodeType t.Status t.Name e.Other) = t.Name;
+GetNodeChildren (t.NodeType e.Node) = e.Children;
+PutNodeChildren (t.NodeType e.Node) e.NewChildren = (t.NodeType e.Node);

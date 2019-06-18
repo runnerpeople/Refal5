@@ -5,10 +5,15 @@ from refal.ast import *
 from refal.constants import *
 from refal.utils import *
 
-from copy import deepcopy
-
 import math
 import sys
+
+
+def deepcopy(obj):
+    if isinstance(obj, list):
+        return [obj_.clone() for obj_ in obj]
+    else:
+        return obj.clone()
 
 
 def change_variable_index(variable, index):
@@ -120,6 +125,9 @@ class SpecialVariable(Term):
         else:
             return super(SpecialVariable, self).__str__()
 
+    def clone(self):
+        return SpecialVariable(self.value, self.type_variable, self.sentence_index)
+
 
 class EqType(Enum):
     Term = 1
@@ -149,6 +157,10 @@ class Equation(object):
     def __hash__(self):
         return hash(self.__str__())
 
+    def clone(self):
+        return Equation(self.left_part.clone(), self.right_part.clone(), self.type_equation, self.func_name,
+                        self.index_sentence, self.sentence.clone())
+
 
 class Substitution(object):
 
@@ -172,6 +184,10 @@ class Substitution(object):
             output_str += " | " + str(self.alternative_right_part)
         return output_str
 
+    def clone(self):
+        return Substitution(self.left_part.clone(), self.right_part.clone(),
+                            None if self.alternative_right_part is None else self.alternative_right_part.clone())
+
 
 class Assignment(object):
 
@@ -190,8 +206,11 @@ class Assignment(object):
     def __str__(self):
         return str(self.left_part) + " <- " + str(self.right_part)
 
+    def clone(self):
+        return Assignment(self.left_part.clone(), self.right_part.clone())
 
-def make_alternative(substitutions):
+
+def make_alternative_substitutions(substitutions):
     i = 0
     substitutions_result = []
     substitutions_variant = []
@@ -210,6 +229,27 @@ def make_alternative(substitutions):
         i += 1
     substitutions_result.append(substitutions_variant)
     return substitutions_result
+
+
+def make_alternative_assignments(assignments):
+    i = 0
+    assignments_result = []
+    assignments_variant = []
+    while i < len(assignments):
+        j = 0
+        while j < len(assignments_variant):
+            if assignments_variant[j].right_part == assignments[i].right_part:
+                break
+            j += 1
+        if j == len(assignments_variant):
+            assignments_variant.append(assignments[i])
+        else:
+            assignments_result.append(deepcopy(assignments_variant))
+            assignments_variant = assignments_variant[:j]
+            i -= 1
+        i += 1
+    assignments_result.append(assignments_variant)
+    return assignments_result
 
 
 def has_alternative(substitutions):
@@ -277,7 +317,6 @@ def delete_same_assignments(assignments, substitution):
         i += 1
 
     return assignments, substitution
-
 
 class Calculation(object):
 
@@ -567,19 +606,23 @@ class Calculation(object):
     def block_to_condition(self):
         for function in self.ast.functions:
             if isinstance(function, Definition):
-                for sentence in function.sentences:
-                    if sentence.block:
-                        function.sentences.remove(sentence)
-
-                        for sentence_block in sentence.block:
-                            sentence_copy = deepcopy(sentence)
+                sentence_result_ = []
+                while len(function.sentences) > 0:
+                    new_sentence = deepcopy(function.sentences[0])
+                    del function.sentences[0]
+                    if new_sentence.block:
+                        for sentence_block in new_sentence.block:
+                            sentence_copy = deepcopy(new_sentence)
                             sentence_copy.block = []
 
                             sentence_result = sentence_copy.result
                             sentence_copy.conditions.append(Condition(sentence_result, sentence_block.pattern))
                             sentence_copy.result = sentence_block.result
 
-                            function.sentences.append(sentence_copy)
+                            sentence_result_.append(sentence_copy)
+                    else:
+                        sentence_result_.append(new_sentence)
+                function.sentences.extend(sentence_result_)
 
     def replace_call(self, terms, func_name, index_sentence, sentence):
         equations = []
@@ -700,6 +743,11 @@ class Calculation(object):
 
         while k < len(system):
             eq = deepcopy(system[k])
+            eq.left_part = self.apply_substitution(eq.left_part, substitutions)
+            eq.right_part = self.apply_substitution(eq.right_part, substitutions)
+
+            # eq.left_part = self.apply_assignment(eq.left_part, assignments)
+            # eq.right_part = self.apply_assignment(eq.right_part, assignments)
 
             if not (len(eq.right_part.terms) > 0 and
                     any(isinstance(term, SpecialVariable) and term.type_variable == SpecialType.none
@@ -708,7 +756,7 @@ class Calculation(object):
                              any(isinstance(term, SpecialVariable) and term.type_variable == SpecialType.none
                                  for term in eq.left_part.terms)):
                 if has_alternative(substitutions):
-                    status, substitution, assignment, k = self.calculate_alternative_system(system,
+                    status, substitution, assignment, _ = self.calculate_alternative_system(system,
                                                                                             substitutions,
                                                                                             assignments,
                                                                                             k,
@@ -731,7 +779,7 @@ class Calculation(object):
                 assignment, substitution = delete_same_assignments(assignment, substitution)
 
                 if has_alternative(substitution):
-                    status, substitution_result, assignments_result, k = self.calculate_alternative_system(system,
+                    status, substitution_result, assignments_result, _ = self.calculate_alternative_system(system,
                                                                                                            substitution,
                                                                                                            assignment,
                                                                                                            k,
@@ -777,7 +825,7 @@ class Calculation(object):
                     for function in ast.functions:
                         if isinstance(function, Definition):
                             for sentence in function.sentences:
-                                if eq.sentence.pattern == sentence.pattern:
+                                if eq.sentence.pos.equals(sentence.pos) and eq.sentence.pattern == sentence.pattern:
                                     sentence.no_substitution = True
 
             else:
@@ -785,6 +833,9 @@ class Calculation(object):
                 eq.right_part = self.apply_substitution(eq.right_part, substitutions)
                 substitution = [Substitution(eq.left_part, eq.right_part)]
                 substitution = [subst for subst in substitution if not subst.left_part == subst.right_part]
+
+                substitution = [subst for subst in substitution if
+                                subst.left_part != Expression([SpecialVariable("@", SpecialType.none)])]
 
                 for subst in substitution:
                     if subst not in substitutions:
@@ -921,6 +972,8 @@ class Calculation(object):
 
         # while j < len(system):
         eq = deepcopy(system[j])
+        eq.left_part = self.apply_substitution(eq.left_part, substitutions)
+        eq.right_part = self.apply_substitution(eq.right_part, substitutions)
         status, substitution_result, assignments_result, _, _ = self.match_equation(eq, substitutions_copy,
                                                                                     assignments_copy,
                                                                                     self.system_result)
@@ -963,7 +1016,7 @@ class Calculation(object):
                 if assign not in assignments_copy:
                     assignments_copy.append(assign)
 
-            j = index
+            # j = index
         else:
             substitution_result = [subst for subst in substitution_result if
                                    not subst.left_part == subst.right_part]
@@ -997,6 +1050,7 @@ class Calculation(object):
             assignments = []
 
             ast = deepcopy(self.ast)
+            self.error_messages = []
 
             if len(self.system_condition_result) > 0 or len(self.system_condition) > 0:
 
@@ -1007,7 +1061,7 @@ class Calculation(object):
                                                                                          system_condition_result,
                                                                                          ast)
 
-                substitutions_variant = make_alternative(substitutions_condition)
+                substitutions_variant = make_alternative_substitutions(substitutions_condition)
                 for substitution_var in substitutions_variant:
                     substitution_var.extend(substitutions)
 
@@ -1082,7 +1136,7 @@ class Calculation(object):
                         substitutions_condition, assignments_condition = self.calculate_equation(
                             substitutions[j], assignments, system_condition, ast)
 
-                        substitutions_variant = make_alternative(substitutions_condition)
+                        substitutions_variant = make_alternative_substitutions(substitutions_condition)
                         for substitution_var in substitutions_variant:
                             for subst in substitutions:
                                 substitution_var.extend(subst)
@@ -1191,7 +1245,7 @@ class Calculation(object):
                         substitutions_result, assignments_result = self.calculate_equation(
                             substitutions[j], assignments, system_result, ast)
 
-                        substitutions_variant = make_alternative(substitutions_result)
+                        substitutions_variant = make_alternative_substitutions(substitutions_result)
                         for substitution_var in substitutions_variant:
                             for subst in substitutions:
                                 substitution_var.extend(subst)
@@ -1205,7 +1259,7 @@ class Calculation(object):
                     substitutions_result, assignments_result = self.calculate_equation(
                         [], [], system_result, ast)
 
-                    substitutions_variant = make_alternative(substitutions_result)
+                    substitutions_variant = make_alternative_substitutions(substitutions_result)
                     for substitution_var in substitutions_variant:
                         for subst in substitutions:
                             substitution_var.extend(subst)
@@ -1254,6 +1308,7 @@ class Calculation(object):
                 if self.is_fixed_point(self.format_function, format_functions_result):
                     break
                 else:
+                    self.print_difference_format(self.format_function, format_functions_result)
                     self.format_function = format_functions_result
 
                     if DEBUG_MODE:
@@ -1308,8 +1363,6 @@ class Calculation(object):
         return True
 
     def match_equation(self, equation, substitution, assignments, system):
-        equation.left_part = self.apply_substitution(equation.left_part, substitution)
-        equation.right_part = self.apply_substitution(equation.right_part, substitution)
         eq = deepcopy(equation)
 
         if eq.left_part.terms == [] and eq.right_part.terms == []:
@@ -1467,8 +1520,9 @@ class Calculation(object):
 
                 if len(eq.right_part.terms) == 1:
                     if isinstance(eq.right_part.terms[0], Variable) and eq.right_part.terms[0].type_variable == Type.e:
-                        assignments.append(
-                            Assignment(Expression(eq.left_part.terms), Expression([eq.right_part.terms[0]])))
+                        if eq.left_part.terms != eq.right_part.terms:
+                            assignments.append(
+                                Assignment(Expression(eq.left_part.terms), Expression([eq.right_part.terms[0]])))
                         return "Success", substitution, assignments, system, eq
                     else:
                         return "Failure", [], [], system, eq
@@ -1624,3 +1678,32 @@ class Calculation(object):
             return term.type_variable.name
         else:
             return str(term)
+
+    def print_difference_format(self, before_format, after_format):
+        if DEBUG_MODE:
+            print(LINE_DELIMITER)
+            print("DIFFERENCE IN FORMAT")
+            common_format = dict()
+            for format_function in before_format:
+                if format_function.left_part not in common_format:
+                    common_format[format_function.left_part] = [format_function.right_part]
+                else:
+                    common_format[format_function.left_part].append(format_function.right_part)
+
+            for format_function in after_format:
+                if format_function.left_part not in common_format:
+                    common_format[format_function.left_part] = [format_function.right_part]
+                else:
+                    common_format[format_function.left_part].append(format_function.right_part)
+
+            for key_group in common_format.keys():
+                if len(common_format[key_group]) == 1:
+                    before_format = self.print_expr(common_format[key_group][0])
+                    print(str(key_group) + " = ", end="")
+                    print(before_format)
+                else:
+                    before_format = self.print_expr(common_format[key_group][0])
+                    after_format = self.print_expr(common_format[key_group][1])
+                    if before_format != after_format:
+                        print(str(key_group) + " = ", end="")
+                        print(before_format + " < " + after_format)

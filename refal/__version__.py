@@ -1,4 +1,4 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__version__ = ('2', '1', '0b4')
+__version__ = ('2', '2', '0rc1')

@@ -1,0 +1,1450 @@
+* REDUND.REF: (scp4.ref)
+* version 26.11.99, new
+
+*  Cleaning input and output formats of a residual program as well as
+*  redundant function calls/blocks. At present the cleaning is done
+*  by a separate module after supercompilation. We can link
+*  the cleaning to a final stage of supercompilation itself.
+*  the cleaning to a final stage of supercompilation itself.
+*  There are a lot of versions of auxilary functions from modules
+*  of the SCP4. They can be removed from here and corrected there when
+*  we will isert the algorithm into the scp4.
+
+*  To do:
+*         - separate executable and residual built-in function;
+*           Sometimes the executable built-in calls can be removed.
+*         - repeated cleaning: can a repeated cleaning improve a program ?
+*           At present I do known an example for that, though in Oakland
+*           I created it ( I forgot ). Can a branch be pruned by the cleaning ?
+*           Can !!!! See an example in ToDo/example1.red
+
+* opsys4.ref
+$EXTERN OutDir;
+
+
+* $ENTRY Go, New;
+
+* $INTERIOR AbsDev, RmPl, AbsInt, AbsIntBr, AbsIntBron, AbsInton, AbsEndBrs;
+* $INTERIOR ExitCall, AbsDevelop, AbsDevelop1, RmDict, PopInfo;
+* $INTERIOR UsedVars, UsedVars1, UsedExpr, UnionUsed, UpdateInfo;
+* $INTERIOR GenInpFmt, GenerInp, GenerAsInp, GenerInp1, GenOutFmt, GenOutFmt1;
+* $INTERIOR GenerOutFmt, UsedOut, UsedOut1, InitAbsInfo;
+* $INTERIOR GetSaveGraph, GetFormats, RfmOutFmt, GetInp, WereFmtsChanged;
+* $INTERIOR CallDict, ClearnFmts;
+* $INTERIOR Result, RmUnusedVars, RmUnused, RmUnusedCall, RmUnusedLastCall;
+* $INTERIOR RmUnusedOut, ClearnOutFmt, FictAs, UsedCall, RmUnusedAs;
+* $INTERIOR ;
+
+* access.ref:
+*$EXTRN ListVar, New;
+
+* trace.ref:
+
+$ENTRY Go {
+  = <Prout 'Clearance of input/output formats in the Scp4\'s residual program.'>
+    <Final>;
+}
+
+/*
+  The algorithm is a kind of an abstract supercompilation of a residual
+  program:
+         -1- an abstract driving of an functional call from it to a next
+             call which will be encounterd. The abstract driving
+             just picks up variables which were contracted or created
+             by a contraction or belongs to a final output. A storage
+             of the function is (UsedVars ...) which is kept inside t.info.
+         -2- we put an ExitCall above each call from residual program
+             and we keep an history of the residual calls inside t.History.
+             So we can manipulate the history in two way. In fact we
+             test repetition of the history in the data ( t.History )
+             and we move an abstract data by the aid of the ExitCalls.
+         -3- There is a global list input/output formats. The list is valid
+             over all residual program and keeps the formats of all
+             residual functions. We start with the list where every format's
+             variable is expectant ( "Am I used or unused ?"). Sometimes
+             we "generalize" the global list: we mark a format's variable
+             as "used". After any generalization we agin develop every call.
+             There can be different strategies here that can improve
+             efficiency of the algorithm itself.
+         -4- The algorithm stops when we did not get new "generalization"
+             from a last development of a call to GRAPH.
+         -5- At this moment we just clean the residual program.
+*/
+
+*******************************************************************************
+/*
+   Abstract development of a c-graph. Abstract data are kept inside t.info.
+   Output of the function is a new graph and changed abstract data.
+   t.info ::= (Info t.History t.Dictionary t.Formats t.UsedVars).
+   t.History is a history of calls along a current branch;
+   t.Dictionary is a state of dictionary of all call from a passed part
+   of the graph ( not only the current branch );
+   t.Formats keeps a global state of output and input format over all c-program
+   ( not only the current graph );
+   t.UsedVars keeps variable which were used to the moment along a current
+   branch;
+   This is a main function to develop.
+*/
+* <AbsDev t.info e.c-graph> ==> e.c-graph t.info'
+AbsDev {
+*1. A fork encountered. Develop the fork branch by branch and analyze a result.
+  t.id t.info (Fork e.brs)
+                  = <AbsEndBrs t.id t.info (Fork <AbsInt t.id t.info e.brs>)>;
+*2. Single branch.
+  t.id t.info e.branch = <RmPl <AbsInt t.id t.info '+'(e.branch)>>;
+} /* End of AbsDev */
+
+* Auxilary function for AbsDev.
+RmPl { '+'(e.br) t.info = e.br t.info; }
+
+* Abstract interpretation of a list of branches: branch by branch.
+* <AbsInt t.id t.info e.branches> ==> e.branches t.info'
+AbsInt {
+ t.id t.info '+'(e.br) e.branches =
+      <AbsInton t.id t.info <AbsIntBron t.id <AbsIntBr t.id t.info '^' e.br>> (e.branches) t.info>;
+} /* End of AbsInt */
+
+/*
+  Function AbsIntBr drives an abstract data through a linear segment of
+  a branch. It stops befor a next function call or block, calls for
+  development the call/block and put a function call - ExitCall
+  to get a result of the development.
+  The pointer '^' separates the members of the pair to be combined
+  or commuted.
+*/
+* <AbsIntBr t.fun-id t.info '^' e.walk> ==> e.walk t.info '^' e.interface
+* where e.interface :: = (t.fork) | []
+AbsIntBr {
+*0. An information. Just update it.
+   t.id t.info '^' (Info e.info1) e.graph =
+       <AbsIntBr t.id <UpdateInfo t.info (Info e.info1)> '^' e.graph>;
+
+*1. A contraction is encountered. Pick up it's variables.
+  t.id t.info '^' (Ct e.contr) e.graph   = (Ct e.contr)
+       <AbsIntBr t.id t.info '^' <UsedVars (Ct e.contr)> e.graph>;
+
+*2. A reference: develop it, get a result and continue over the current branch.
+  t.id t.info '^' (As e.assign) t.basic e.graph =
+       <ExitCall t.id t.info (As e.assign) t.basic '^'
+                 <AbsDevelop t.info (As e.assign) t.basic> (GRAPH e.graph)>;
+
+*3. A passive end.
+  t.id t.info '^' (Out e.assign) = (Out e.assign)
+             <AbsIntBr t.id t.info '^' <UsedVars (Out <Order e.assign>) <TakeOutFmt t.id t.info>>>;
+
+*4. A liner segment has been finished.
+  t.id t.info '^' =  t.info '^';
+
+*5. A problem is encountered. End in the linear segment of the walk.
+  t.id t.info '^' t.interface e.graph = t.info '^' (t.interface e.graph);
+} /* End of AbsIntBr */
+
+
+*  To test the result of normalization of a linear segment.
+*  <AbsIntBron t.fun-id e.walk t.information '^' e.graph> ==> e.walk t.info' '^'
+AbsIntBron {
+*1. A fork.
+  t.id e.walk t.info '^' ((Fork e.brs))
+             = e.walk <AbsEndBrs t.id t.info (Fork <AbsInt t.id t.info e.brs>)> '^';
+*2. A linear segment is finished.
+  t.id e.walk t.info '^' = e.walk t.info '^';
+} /* End of AbsIntBron */
+
+/*
+   Function AbsInton picks up abstract data from a driven branch and
+   continues along the next one with an information which was valid
+   on an head of the fork where the branches.
+*/
+* <AbsInton t.fun-id t.old-info e.branch t.new-info '^' (e.branches) t.union-info>
+*                  ==> e.branches t.info'
+AbsInton {
+*1. A liner segment is finished. Process the next branch.
+  t.id
+  (Info t.o-hist t.o-dict e.old-info t.o-fmts t.o-used) e.walk
+  (Info t.hist1 t.dict1 e.info1 t.fmts1 t.used1) '^' ('+' (e.br) e.brs)
+  (Info t.u-hist t.u-dict e.union-info t.u-fmts t.u-used)
+    = '+' (e.walk)
+      <AbsInton t.id (Info t.o-hist t.o-dict e.old-info t.o-fmts t.o-used)
+        <AbsIntBron t.id <AbsIntBr t.id (Info t.o-hist t.dict1 e.old-info t.fmts1 t.o-used)
+                             '^' e.br>> (e.brs)
+          (Info t.u-hist t.dict1 e.union-info t.fmts1 <UnionUsed t.u-used t.used1>)
+      >;
+
+*2. The linear segment is finished. The last branch.
+  t.id t.old-info e.walk
+  (Info t.hist1 t.dict1 e.info1 t.fmts1 t.used1) '^' ()
+  (Info t.u-hist t.u-dict e.union-info t.u-fmts t.u-used)
+     = '+'(e.walk)
+          (Info t.u-hist t.dict1 e.union-info t.fmts1 <UnionUsed t.u-used t.used1>);
+} /* End of AbsInton */
+
+* <AbsEndBrs t.fun-id t.old-info (Fork e.brs t.new-info)> ==> (Fork e.brs) t.info
+AbsEndBrs {
+*1. Every branch is passed.
+  t.id t.info (Fork e.branches t.info1) = (Fork e.branches) t.info1;
+*  = (Fork e.branches) (Info t.hist t.dict1 e.info t.fmts1 t.used1);
+} /* End of AbsEndBrs */
+
+/*
+  Function ExitCall takes care to join an information from development a call
+  or branch with an current information.
+  We put an ExitCall above each call from residual program and we keep
+  an history of the residual calls inside t.History. So we can manipulate
+  the history in two way. In fact we test repetition of the history in
+  the data ( t.History ) and we move an abstract data by the aid of
+  the ExitCalls.
+*/
+* <ExitCall t.fun-id t.info t.assign t.basic '^' e.graph t.new-info (GRAPH e.graph1)>
+* <ExitCall t.fun-id t.info t.assign t.basic '^' e.graph t.newinfo '^'>
+*            ==>  t.assign t.basic t.info' '^'
+ExitCall {
+**************************** Exit from a call. *****************************
+*1. An reference. There is a new information about formats.
+*   Repeat the abstract interpretation.
+ t.id t.info (As e.assign) t.basic '^' e.graph t.newinfo (GRAPH e.gr),
+ <WereFmtsChanged t.info t.newinfo>: (True t.info1), t.basic:
+/*+   { (Basic e.basic1) = <AbsIntBr t.id t.info1 '^' (As e.assign) t.basic e.gr>;
+     (Begin s.name e.subgr ':' t.out End) = <AbsIntBr t.id t.info1
+            '^' (As e.assign) (Begin s.name e.graph ':' t.out End) e.gr>;
+   };
+*/
+   { (Basic GRAPH e.basic1)
+*+              = <AbsIntBr t.id t.info1 '^' (As e.assign) t.basic e.gr>;
+              = <AbsIntBron t.id <AbsIntBr t.id t.info1 '^' (As e.assign) t.basic e.gr>>;
+     t.basic1 = <ExitCall t.id t.info1 (As e.assign) t.basic '^' e.graph t.info1 (GRAPH e.gr)>;
+   };
+
+*2. An reference. There is not a new information about formats.
+ t.id t.info t.assign (Basic e.basic) '^' e.graph t.newinfo (GRAPH e.gr) =
+    <ExitCall t.id t.info t.assign (Basic e.basic)
+*+             '^' <AbsIntBr t.id t.newinfo '^' e.gr>>;
+             '^' <AbsIntBron t.id <AbsIntBr t.id t.newinfo '^' e.gr>>>;
+
+*2a. A block. There is not a new information about formats.
+ t.id t.info t.assign (Begin s.name e.subgr':' t.out End) '^' e.graph t.newinfo (GRAPH e.gr) =
+    <ExitCall t.id t.info t.assign (Begin s.name e.graph ':' t.out End)
+*+             '^' <AbsIntBr t.id t.newinfo '^' e.gr>>;
+             '^' <AbsIntBron t.id <AbsIntBr t.id t.newinfo '^' e.gr>>>;
+
+********************** A branch has finished. ******************************
+*3. An reference. There is a new information about formats.
+ t.id t.info (As e.assign) t.basic '^' e.graph t.newinfo '^',
+ <WereFmtsChanged t.info t.newinfo>: (True t.info1)
+*+                =  <AbsIntBr t.id t.info1 '^' (As e.assign) t.basic e.graph>;
+  , t.basic:
+   { (Basic GRAPH e.basic1)
+*+              = <AbsIntBr t.id t.info1 '^' (As e.assign) t.basic e.graph>;
+              = <AbsIntBron t.id <AbsIntBr t.id t.info1 '^' (As e.assign) t.basic e.graph>>;
+     t.basic1 = <ExitCall t.id t.info1 (As e.assign) t.basic '^' e.graph t.info1 '^'>;
+   };
+
+*4. A reference. There is not a new information about formats.
+ t.id t.info t.assign (Basic s.name s.type e.basic t.outfmt ':' t.var) '^'
+ e.gr t.newinfo '^',
+ <GenOutFmt s.name s.type (t.outfmt t.var) t.info t.newinfo (Gr e.gr)>:
+  { /* The output format was generalized */
+*+    (Gener t.ginfo)
+    (Gener t.ginfo t.out), s.name: GRAPH
+       = <ExitCall t.id t.info t.assign (Basic s.name s.type e.basic t.outfmt ':' t.var)
+*+                     '^' <AbsIntBr t.id t.ginfo '^' e.gr>>;
+                     '^' <AbsIntBron t.id <AbsIntBr t.id t.ginfo '^' e.gr>>>;
+    (Gener (Info e.ginfo t.gfmts t.gused) t.out), t.newinfo:
+           (Info e.ninfo t.nfmts t.nused)
+       = t.assign (Basic s.name s.type e.basic t.outfmt ':' t.out)
+         e.gr <UpdateInfo t.info (Info e.ninfo t.gfmts t.nused) t.assign s.name s.type> '^';
+
+    /* Temporary definition. Here me can mark the call as Used/Unused.  */
+    (No t.out) = t.assign (Basic s.name s.type e.basic t.outfmt ':' t.out)
+                  e.gr <UpdateInfo t.info t.newinfo t.assign s.name s.type> '^';
+  };
+
+*4. A block.
+ t.id t.info t.assign (Begin s.name e.subgr ':' t.out End) '^'
+ e.gr t.newinfo '^', <GenOutFmt s.name Subgr (t.out) t.info t.newinfo (Gr e.gr)>:
+  { /* The output format was generalized */
+*+    (Gener t.ginfo)
+    (Gener (Info e.ginfo t.gfmts t.gused) t.out1), t.newinfo:
+           (Info e.ninfo t.nfmts t.nused)
+          = t.assign (Begin s.name e.subgr ':' t.out1 End)
+            e.gr <UpdateInfo t.info (Info e.ninfo t.gfmts t.nused) t.assign s.name Subgr> '^';
+/*+       = <ExitCall t.id t.info t.assign (Begin s.name e.subgr ':' t.out End)
+                     '^' <AbsIntBr t.id t.ginfo '^' e.gr>>;
+*/
+     (No t.out1) = t.assign (Begin s.name e.subgr ':' t.out1 End)
+                  e.gr <UpdateInfo t.info t.newinfo t.assign s.name Subgr> '^';
+  };
+}
+
+/*
+   Function AbsDevelop drives an abstract data through a given call and
+   accepts a return information. Development of the call is done in according
+   to the call's history: we develop the call just if there is not a call
+   to the same function in the history.
+*/
+* <AbsDevelop t.info t.assign t.basic> ==> e.graph t.info'
+AbsDevelop {
+ t.info t.assign t.basic
+  = <PopInfo t.info t.assign t.basic <AbsDevelop1 t.info t.assign t.basic>>;
+}
+
+* <AbsDevelop1 t.info t.assign t.basic> ==> e.graph t.info'
+AbsDevelop1 {
+*1. An external reference. It's whole argument is used.
+ (Info t.history (Dict s.world e.dict) e.info t.used)
+ (As e.assign) (Basic s.name Built e.basic)
+                  = (Info t.history (Dict Extern e.dict) e.info (UsedVars));
+
+*2. The function belongs to the history. Nothing to do.
+* Temporary definition: - open e-variables.
+ (Info (History e.0 (s.name s.type) e.hist) e.info t.used)
+ t.assign (Basic s.name s.type e.basic)
+                  = (Info (History e.0 (s.name s.type) e.hist) e.info (UsedVars));
+
+*3. The function does not belong to the history. Develop it.
+ (Info (History e.hist) (Dict s.world e.dict) e.info t.fmts t.usedvars)
+ (As e.assign) (Basic s.name s.type e.basic) =
+     <AbsDev (s.name s.type)
+             (Info (History e.hist (s.name s.type)) (Dict Intern) e.info t.fmts
+                     <UsedVars1 (Start e.assign) <GetInp s.name s.type t.fmts>>)
+                  <GetSaveGraph s.name>>;
+
+*4. A block. Develop it.
+ (Info t.history (Dict s.world e.dict) e.info t.fmts t.usedvars)
+ (As e.assign) (Begin s.name e.subgr ':' t.out End) =
+      <AbsDev (s.name Subgr) (Info t.history (Dict Intern) e.info
+                <PutFmts s.name Subgr (As e.assign) t.out t.fmts>
+                <UsedVars1 (Start e.assign) (Input e.assign)>) e.subgr>;
+}
+
+/*  Accept a return information. It "generalize" an input format of
+    the function which was called in according a list of variables
+    that were sure used inside the function.
+*/
+* <PopInfo t.info t.assign t.basic t.return-info> ==> e.graph t.info'
+PopInfo {
+*1. Call to a built-in function.
+ t.info t.assign (Basic s.name Built e.basic) t.new-info
+   =  <GenInpFmt s.name Built t.assign t.new-info>;
+
+*2. Call to a internal function. The call belongs to the history.
+ (Info (History e.0 (s.name s.type) e.hist) e.info t.used)
+ t.assign (Basic s.name s.type e.basic) e.graph t.new-info
+   =  <GenInpFmt s.name s.type t.assign t.new-info>;
+
+*2. Call to a internal function. The call does not belong to the history.
+*   That means the call is uppermost.
+*   Here we save a new version of the function where some used-marks
+*   were put. The next iteration of the algorithm will drive through
+*   the renewed graph.
+ t.info t.assign (Basic s.name s.type e.basic) e.graph t.new-info
+   =  <Save Graphs (s.name e.graph)>
+      <GenInpFmt s.name s.type t.assign t.new-info>;
+
+*3. Block.
+ t.info t.assign (Begin s.name e.subgr ':' t.out End) e.graph t.new-info
+   =  e.graph <GenInpFmt s.name Subgr t.assign t.new-info>;
+}
+
+* Pick up used variables from a structure.
+UsedVars { e.where = (Info <UsedVars1 e.where>); }
+UsedVars1 { e.where = (UsedVars <ListVar Of Expr <UsedExpr e.where>>); }
+
+* Pick up used expression from a structure.
+UsedExpr {
+*1. A contraction.
+ (Ct t.var ':' e.pattern) = t.var e.pattern;
+*3. Used expressions from a final output in according to an output format.
+*+ (Out (e.val':'t.var) e.assign) =
+ (Out e.assign) (Output e.outfmt) = <UsedExpr (As e.assign) (Input e.outfmt)>;
+*+ e.val <UsedExpr (Out e.assign)>;
+
+*3. Used expressions from an assignment in according to an input format.
+*   An expression is put in a used variable: the expression is used.
+ (As (e.val':' (Var s.type s.id e.var)) e.assign)
+ (Input (e.val1 ':'(Var s.type s.id1 Used e.var1)) e.inpfmt)
+       = e.val <UsedExpr (As e.assign) (Input e.inpfmt)>;
+
+*4. Used variables from a start assignment in according to an input format.
+ (Start (e.val':' (Var s.type s.id e.var)) e.assing)
+ (Input (e.val1 ':'(Var s.type s.id1 Used e.var1)) e.inpfmt)
+       = (Var s.type s.id e.var) <UsedExpr (Start e.assing) (Input e.inpfmt)>;
+
+*5. A format's variable is not used.
+ (s.As t.assign e.assigns) (Input t.assign1 e.inpfmt)
+                   = <UsedExpr (As e.assigns) (Input e.inpfmt)>;
+*6. Exit.
+ e.trash = ;
+}
+
+* <UnionUsed t.used-vars t.used-vars1> ==> t.used-vars
+UnionUsed {
+ (UsedVars e.vars) (UsedVars e.vars1) = (UsedVars <ClearVar e.vars e.vars1>);
+}
+
+/*
+  Update an old information in according to a new information.
+*/
+* <UpdateInfo t.old-information e.new-information> ==> t.info'
+UpdateInfo {
+*1. New used variables.
+ (Info e.info (UsedVars e.vars)) (Info (UsedVars e.vars1))
+       = (Info e.info (UsedVars <ClearVar e.vars e.vars1>));
+
+*2. Call to a built-in function. The call is sure residual and
+*   a format of the function cannot be changed so every variable from
+*   the call is used.
+ t.info t.newinfo (As e.assign) s.name Built
+       = <UpdateInfo t.info t.newinfo
+              <UsedVars1 (As e.assign)(Input ((Var 'e' 1)':'(Var 'e' 1 Used)))>>;
+
+*3. Call to an internal function. Pick up used variables from its assignment
+*   in according to a current stage of an input format of the function.
+  t.info
+ (Info e.newinfo (Formats e.1 (s.name s.type t.inp e.fmt) e.2) t.used)
+ t.assign s.name s.type
+       = <UpdateInfo t.info (Info e.newinfo
+                              (Formats e.1 (s.name s.type t.inp e.fmt) e.2) t.used)
+                    <UsedVars1 t.assign t.inp>>;
+
+*4. New used variables.
+ (Info t.hist t.dict e.info (UsedVars e.vars))
+ (Info t.hist1 t.dict1 e.info1 (UsedVars e.vars1)) (UsedVars e.vars2)
+       = (Info t.hist1 t.dict1 e.info1 (UsedVars <ClearVar e.vars e.vars1 e.vars2>));
+}
+
+/* Generalize an input format when development of a call has just finished.
+*/
+* <GenInpFmt s.fun-name s.type t.assign t.return-info> ==> t.gen-info
+GenInpFmt {
+*1. Call to a built-in function. Just generalize the dictionary.
+ s.name Built t.assign (Info t.hist (Dict s.world e.dict) e.return-info)
+        = (Info t.hist (Dict Extern e.dict) e.return-info);
+
+*2. Call to an internal function. Generalization.
+ s.name s.type t.assign
+ (Info t.hist t.dict1 e.info
+ (Formats e.1 (s.name s.type t.inp t.out t.dict) e.fmts) t.used)
+        = (Info t.hist t.dict1 e.info
+                (Formats e.1 (s.name s.type <GenerInp t.assign t.used t.inp> t.out
+                             <GenerDict t.dict1 t.dict>) e.fmts) (UsedVars));
+
+/*+
+*3. A subgraph is encounterd. The Formats-bag does not keep its format.
+*   Generalize its input format and save inside the bag.
+*   Here me put an fictitious output format. The format will be changed later.
+ s.name Subgr (As e.assign) (Info e.return-info (e.fmts) t.used)
+        = (Info e.return-info
+                (e.fmts (s.name Subgr <GenerInp (As e.assign) t.used (Input e.assign)>
+                  (Output))) (UsedVars));
+*/
+}
+
+* Auxilary function for GenInpFmt.
+GenerDict {
+ (Dict Extern e.dict1) t.dict = (Dict Extern);
+ t.dict1 (Dict Extern e.dict) = (Dict Extern);
+ t.dict1 t.dict = (Dict Intern);
+}
+
+* <GenerInp t.assign t.used-vars t.input> ==> t.input
+* Auxilary function for GenInpFmt.
+GenerInp {
+ t.assign t.used t.inp = (Input <GenerInp1 <GenerAsInp t.assign t.used> t.inp> );
+}
+
+/*
+  Function GenerAsInp marks format's variables in an assignment as used ones
+  if the variables belong to a used-variable list.
+*/
+* <GenerAsInp t.assign t.used-vars> ==> t.gen-assignment
+GenerAsInp {
+ (As e.1 (e.val ':' (Var s.id s.type e.var)) e.assign)
+ (UsedVars e.2 (Var s.id s.type e.var1) e.vars)
+       = <GenerAsInp (As e.1 (e.val ':' (Var s.id s.type Used e.var)) e.assign)
+                   (UsedVars e.2 e.vars)>;
+ t.assign t.used = t.assign;
+}
+
+/*
+  Function GenerInp1 genralizes an input format in according to an assignment.
+  The function marks format's variable as used ones in the format if
+  correpondig format's units are used in the assignment.
+*/
+* <GenerInp1 t.assignment t.input-format> ==> e.gen-input-format-assignment
+GenerInp1 {
+ (As (e.val  ':' (Var s.t s.id e.var)) e.assign)
+ (Input (e.val1 ':' (Var s.t1 s.id1 Used e.var1)) e.input)
+             = (e.val1 ':' (Var s.t1 s.id1 Used e.var1))
+               <GenerInp1 (As e.assign) (Input e.input)>;
+ (As (e.val  ':' (Var s.type s.id Used e.var)) e.assign)
+ (Input (e.val1 ':' (Var s.t1 s.id1 /* Expectant */ e.var1)) e.input)
+             = (e.val1 ':' (Var s.t1 s.id1 Used e.var1))
+               <GenerInp1 (As e.assign) (Input e.input)>;
+
+ (As (e.val  ':' (Var s.type s.id /* Expectant */ e.var)) e.assign)
+ (Input (e.val1 ':' (Var s.t1 s.id1 /* Expectant */ e.var1)) e.input)
+             = (e.val1 ':' (Var s.t1 s.id1 /* Expectant */ e.var1))
+               <GenerInp1 (As e.assign) (Input e.input)>;
+ (As ) (Input ) = ;
+}
+
+/*
+  Function GenOutFmt generalizes an output format when a branch after
+  a call to the function has been just driven. The function return:
+  (No t.out) if no real generalization, t.out is marked as used or expectant.
+  (Gener t.gen-information) if the output format was sure generalized.
+*/
+* Temporary definition.
+* <GenOutFmt s.name s.type t.out t.info t.newinfo (Gr e.gr)>
+*      ==> (No t.out) | (Gener t.gen-info)
+GenOutFmt {
+*1. A last call. The call is sure used.
+ s.name s.type t.out t.info t.newinfo (Gr ) = (No <UsedOut1 Used t.out>);
+
+*2. A call to built-in function. Its output is sure used.
+ s.name Built t.out-var t.info t.newinfo (Gr e.gr) = (No <UsedOut1 Used t.out-var>);
+
+/*2. There is a new information about formats. There is not that.
+ s.name s.type  t.outfmt t.info t.newinfo (Gr e.gr),
+ <WereFmtsChanged t.info t.newinfo>: (True t.ginfo) = (Gener t.ginfo);
+*/
+
+*3. There is not a new information about formats. An internal function.
+*   Check: is sure used the call ? If that is "yes", then generalize
+*   the output format.
+*+ s.name Func  ((Output t.restr (e.expr':'t.var)) t.out-var)
+ s.name Func  (t.outfmt t.out-var)
+ t.info (Info e.newinfo t.n-used) (Gr e.gr),
+*+ <ListVar Of Expr e.expr>: e.listvars,
+ <ListVar Of Expr <SelfOut t.outfmt>>: e.listvars,
+ <UsedOut (e.listvars) (UsedOuts) t.n-used t.out-var>:
+    { (UnUsed) t.unused-var = (No t.unused-var);
+      (UsedOuts e.uvars) t.used-var
+              = <GenOutFmt1 s.name Func t.info  (Info e.newinfo t.n-used)
+                           (UsedOuts e.uvars) t.used-var>;
+    };
+
+*4. There is not a new information about formats. A block.
+*   Check: is sure used the call ? If that is "yes", then generalize
+*   the output format.
+ s.name Subgr  ((Output t.restr (e.expr':'t.out-var))) t.info
+ (Info e.newinfo t.n-used) (Gr e.gr),
+*+  <ListVar Of Expr e.expr>: e.listvars,
+ <SelfOut (Output t.restr (e.expr':'t.out-var))>: e.out-expr,
+ <ListVar Of Expr e.out-expr>: e.listvars,
+ <UsedOut (e.listvars) (UsedOuts) t.n-used t.out-var>:
+    { (UnUsed) t.unused-var = (No (Output t.restr (e.out-expr':'t.unused-var)));
+      (UsedOuts e.uvars) t.used-var
+          = <GenOutFmt1 s.name Subgr t.info  (Info e.newinfo t.n-used)
+                       (UsedOuts e.uvars) (Output t.restr (e.out-expr ':'t.used-var))>;
+       /* generalization inside of the subgraph' structure itself
+       * There is no reference to the subgraph from anywhere so we can
+       * do generalization "without generalization".  *
+      (UsedOuts e.uvars) t.used-var
+        = (No (Output t.restr (<Subs <IdAss From Vars e.uvars> e.out-expr> ':'t.used-var)));
+        */
+    };
+}
+
+* Generalization of an output format with respect to a variable list.
+* <GenOutFmt1 s.fun-name s.type t.old-info t.new-info t.UsedVars t.out-var>
+*      ==> (No t.out) | (Gener t.gen-info)
+GenOutFmt1 {
+ s.name s.type
+ (Info t.o-hist t.o-dict e.old-info t.o-fmts t.o-used)
+ (Info t.n-hist t.n-dict e.newinfo (Formats e.1 (s.name s.type t.inp t.out e.dict) e.n-fmts) t.n-used)
+ (UsedOuts e.uvars) t.out-var, <GenerOutFmt No (UsedOuts e.uvars) t.out>:
+    { e.assign Gener =
+          (Gener (Info t.o-hist t.o-dict e.old-info
+                  (Formats e.1 (s.name s.type t.inp (Output e.assign) e.dict) e.n-fmts)
+                  t.o-used) t.out-var);
+*+                  t.o-used));
+      e.trash  No = (No t.out-var);
+    };
+}
+
+* Generalization of an output format with respect to a variable list.
+* <GenerOutFmt s.flag (UsedOuts e.uvars) t.out> ==> e.assign s.flag
+* s.flag ::= No | Gener
+GenerOutFmt {
+*0. An output format's variable was used before.
+ s.flag (UsedOuts t.var1 e.vars)
+ (Output (e.val ':'(Var s.t s.id Used e.var)) e.outfmt)
+        = (e.val ':'(Var s.t s.id Used e.var))
+          <GenerOutFmt s.flag (UsedOuts e.vars) (Output e.outfmt)>;
+
+*1. There is a new used variable. Real generalization.
+ s.flag (UsedOuts (Var s.t s.id1 Used e.var1) e.vars)
+ (Output (e.val ':'(Var s.t s.id e.var)) e.outfmt)
+        = (e.val ':'(Var s.t s.id Used e.var))
+          <GenerOutFmt Gener (UsedOuts e.vars) (Output e.outfmt)>;
+
+*2. A unused variable.
+ s.flag (UsedOuts t.var1 e.vars) (Output (e.val ':'t.var) e.outfmt)
+        = (e.val ':' t.var) <GenerOutFmt s.flag (UsedOuts e.vars) (Output e.outfmt)>;
+
+*3. Exit.
+ s.flag (UsedOuts) (Output) = s.flag;
+}
+
+/*
+  Function UsedOut picks up used output's variables from a list.
+  It marks an output as used if there are the used output's variables.
+*/
+* <UsedOut (e.out-vars) (UsedOuts) t.UsedVars t.out-var>
+*          ==> (UsedOuts e.used-outs) t.out-var'
+UsedOut {
+*0. An output variable is used.
+ ((Var s.type s.id Used e.var) e.out-vars) (UsedOuts e.uvars)
+ (UsedVars e.2) t.out-var
+       = <UsedOut (e.out-vars) (UsedOuts e.uvars (Var s.type s.id Used e.var))
+                  (UsedVars e.2) t.out-var>;
+
+*1. An output variable is used.
+ ((Var s.type s.id e.var) e.out-vars) (UsedOuts e.uvars)
+ (UsedVars e.2 (Var s.type s.id e.var1) e.3) t.out-var
+       = <UsedOut (e.out-vars) (UsedOuts e.uvars (Var s.type s.id Used e.var))
+                  (UsedVars e.2 e.3) t.out-var>;
+
+*2. An output variable is not used.
+ (t.var e.out-vars) (UsedOuts e.uvars) t.UsedVars t.out-var
+       = <UsedOut (e.out-vars) (UsedOuts e.uvars t.var) t.UsedVars t.out-var>;
+
+*3. Exit. There are a number of used output variables.
+ () (UsedOuts e.1 (Var s.type s.id Used e.var) e.uvars) t.UsedVars t.out-var
+       = (UsedOuts e.1 (Var s.type s.id Used e.var) e.uvars)
+         <UsedOut1 Used t.out-var>;
+*4. Exit. There is no used output variable.
+ () (UsedOuts e.vars) t.UsedVars t.out-var = (UnUsed) <UsedOut1 UnUsed t.out-var>;
+}
+
+* Auxilary function for UsedOut.
+* Temporary definition
+* <UsedOut1 s.used-type t.out> ==> t.out'
+UsedOut1 {
+ Used (Var s.type s.id Used e.var) = (Var s.type s.id Used e.var);
+ Used (Var s.type s.id e.var) = (Var s.type s.id Used e.var);
+ UnUsed (Var s.type s.id Used e.var) = (Var s.type s.id e.var);
+ UnUsed (Var s.type s.id e.var) = (Var s.type s.id e.var);
+
+* Basic
+ s.used (t.Output t.var) = <UsedOut1 s.used t.var>;
+* subgraph.
+ s.used ((Output (e.expr':'t.var))) = (Output (e.expr':' <UsedOut1 s.used t.var>));
+}
+
+********************* The End of the mark-algorithm. **********************
+
+*==============================================================
+* The main function.
+* <Final> ==> []
+$ENTRY Final {
+* Pick up information about formats of c-graphs. Drive output formats
+* along the graphs. Clean the c-graphs if some graphs were reduced to Zero.
+  , <InitBox> <Final1 <GetResids <GetGraphF 'content.int'>>>: e.1,
+    <Dg RemovedCall>: { False  = ;
+                        True = <Final>; };
+ }
+
+Final1 {
+ e.1 (GRAPH Zero) e.2 = ;
+ e.graphs = <FinalOutGraphs <ClearnFmts <InitAbsInfo> e.graphs>>;
+* e.graphs = <XXX <ClearnFmts <InitAbsInfo> e.graphs>>;
+}
+
+XXX { XXX = ; }
+
+* Initialization of an abstract storage.
+InitAbsInfo {
+  = (Info (History) (Dict Intern) (Formats <GetFormats>) (UsedVars));
+}
+
+* <ClearnFmts t.info (s.name graph) ...> = (s.name graph') ...
+ClearnFmts {
+* The whole residual program is Zero.
+ t.info e.graphs (GRAPH ) = ((GRAPH Zero) Zero);
+ t.info e.graphs (GRAPH e.graph)
+      = <Br Graphs '=' (GRAPH e.graph) e.graphs>
+        <Result <AbsIntBron (GRAPH Func) <AbsIntBr (GRAPH Func) t.info '^' <StartConf t.info>>>>;
+
+* Temporary definition. No reference to the graph.
+* See GetSaveInp/Out for additional comments.
+* (s.name e.graph) e.graphs = <ClearnFmts e.graphs>;
+ t.info = ;
+}
+
+* Get graph from a box.
+GetSaveGraph { s.name, <Cp Graphs>: e.1 (s.name e.graph) e.graphs = e.graph; }
+
+* Get formats from a box.
+* <GetFormats>
+*  ==> (Formats (s.fun-name s.type (Input e.assign) (Output e.assign)
+*                            (Dict e.dict))...)
+GetFormats {
+      = <GetFormats (<Cp InpFmts>) (<Cp OutFmts>)>;
+ ((s.name (As e.inp)) e.inp-formats) (e.1 (s.name t.out) e.out-formats)
+      = (s.name Func (Input e.inp) <RfmOutFmt t.out> (Dict Intern))
+        <GetFormats (e.inp-formats) (e.1 e.out-formats)>;
+
+ ()() = (GRAPH Func (Input ((Var 'e' 1)':'(Var 'e' 1)))
+                    (Output ((Var 'e' 0)':'(Var 'e' 0 Used))) (Dict Intern));
+}
+
+* Reformat an output format.
+RfmOutFmt {
+ (Output t.restr (e.expr':'t.var)) ,
+ <SelfOut (Output t.restr (e.expr':'t.var))>: e.outexpr
+                  = (Output <IdAss From Vars1 <ListVar Of Expr e.outexpr>>);
+*? From Vars e.vars = <IdAss From Vars1 e.vars>;
+}
+
+* Get an input format from.
+* <GetInp s.name s.type t.formats> ==> t.input-format
+GetInp {
+ s.name s.type (Formats e.1 (s.name s.type t.inp e.fmt) e.formats) = t.inp;
+}
+
+TakeOutFmt {
+ (s.name s.type)
+ (Info e.info (Formats e.1 (s.name s.type t.inp (Output e.out) e.dict) e.formats) t.used)
+       = (Output <Order e.out>);
+}
+
+* <PutFmts s.name s.type (As e.assign) t.out t.formats> ==> t.formats'
+PutFmts {
+*1. There are formats. Nothing to do.
+ s.name s.type t.assign t.Output (Formats e.1 (s.name Subgr e.fmt) e.fmts)
+        = (Formats e.1 (s.name s.type e.fmt) e.fmts);
+
+*2. There are not formats. Put them.
+*+ s.name Subgr (As e.assign) (Output t.restr (e.expr':'t.var)) (Formats e.fmts)
+ s.name Subgr (As e.assign) t.outfmt (Formats e.fmts)
+        = (Formats e.fmts (s.name Subgr
+                           (Input e.assign)
+*+                           (Output <IdAss From Vars1 <ListVar Of Expr e.expr>>)
+             (Output <IdAss From Vars1 <ListVar Of Expr <SelfOut t.outfmt>>>)
+                           (Dict Intern)));
+}
+
+* A predicate: Were formats changed ?
+* <WereFmtsChanged t.old-info t.new-info> ==> False | (True t.info)
+WereFmtsChanged {
+*1. Temporary definition. The formats were not changed.
+ (Info e.info (Formats e.formats) t.used)
+ (Info e.new-info (Formats e.formats) t.new-used) = False;
+
+*2. The formats were changed. Put the new format inside the old information.
+ (Info t.hist t.dict e.info t.fmts t.used)
+ (Info t.hist1 t.dict1 e.info1 t.fmts1 t.used1) =
+               (True (Info t.hist t.dict e.info t.fmts1 t.used));
+}
+
+***************** Final stage of the cleaning. ************************
+
+/*  Final stage of the cleaning: we just remove variables and calls in
+    the residual program which were not marked as used ones.
+*/
+* <Result e.graph t.info '^'> ==> (s.name e.graph) ...
+Result {
+ e.graph (Info t.hist t.dict e.info t.fmts t.used)
+ '^' =  (<RmUnusedFs t.fmts>) <RmUnusedVars t.fmts <Dg Graphs>>;
+}
+
+
+* <RmUnusedFs t.fmts> ==> (FormalInps e.inpfmts) (FormalOuts e.outfmts)
+RmUnusedFs {
+ t.fmts = (FormalInps (GRAPH <GetSaveInp GRAPH>) <RmUnFmt t.fmts <Cp InpFmts>>)
+          (FormalOuts (GRAPH <GetSaveOut GRAPH>) <RmUnFmt t.fmts <Cp OutFmts>>);
+}
+
+RmUnFmt {
+ (Formats (s.name Func t.inpfmt t.outfmt t.dict) e.2)
+ e.3 (s.name (As e.assign)) e.form-fmts
+     = (s.name (As <RmUnusedAs t.inpfmt (As <Order e.assign>)>))
+       <RmUnFmt (Formats e.2) e.3 e.form-fmts>;
+
+ (Formats (s.name Func t.inpfmt t.outfmt t.dict) e.2)
+ e.3 (s.name (Output t.restr (e.expr':'t.var))) e.form-fmts,
+ <SelfOut (Output t.restr (e.expr':'t.var))>: e.outexpr
+     = (s.name <ClearnOutFmt t.outfmt (Output t.restr (e.outexpr':'t.var))>)
+       <RmUnFmt (Formats e.2) e.3 e.form-fmts>;
+
+ (Formats (s.name Subgr e.fmts) e.2) e.form-fmts
+     = <RmUnFmt (Formats e.2) e.form-fmts>;
+
+ (Formats (GRAPH Func e.fmts) e.2) e.form-fmts
+     = <RmUnFmt (Formats e.2) e.form-fmts>;
+
+ (Formats ) e.form-fmts = ;
+}
+
+
+* <RmUnusedVars t.formats e.graphs> ==> (s.name e.graph) ...
+RmUnusedVars {
+ t.fmts (s.name e.gr) e.graphs
+        = (s.name <RmUnused (s.name Func) t.fmts e.gr>) <RmUnusedVars t.fmts e.graphs>;
+ t.fmts = ;
+}
+
+* <RmUnused (s.fun-name s.type) t.formats e.graph> ==> e.graph
+RmUnused {
+*1. A last reference.
+ t.id t.fmts (As e.assign) t.basic =
+     <RmUnusedLastCall t.id t.fmts (As e.assign) t.basic>;
+
+*2. A reference is not last.
+ t.id t.fmts (As e.assign) t.basic e.graph =
+     <RmUnusedCall t.fmts (As e.assign) t.basic>
+     <RmUnused t.id t.fmts e.graph>;
+
+ t.id t.fmts (Fork e.brs) = (Fork <RmUnused t.id t.fmts e.brs>);
+ t.id t.fmts '+' (e.br) e.brs = '+'(<RmUnused t.id t.fmts e.br>)
+                                   <RmUnused t.id t.fmts e.brs>;
+ t.id t.fmts (Out e.assign) = <RmUnusedOut t.id t.fmts (Out e.assign)>;
+ t.id t.fmts (Ct e.cntr) e.graph = (Ct e.cntr) <RmUnused t.id t.fmts e.graph>;
+ t.id t.fmts                = ;
+}
+
+* Clearance of a non-last call.
+* <RmUnusedCall t.formats t.assign t.basic> => t.assign' t.basic' | []
+RmUnusedCall {
+*0. An internal call is Zero (empty output) or Null (empty input)
+/* (Formats e.1 (s.name Func t.inp t.out) e.2)
+ t.assign (Basic s.name Func e.basic t.dict t.outfmt ':' t.var)
+      = Zero | []
+*/
+
+*1. An internal call is used. Clearance of its assignment and output format.
+ (Formats e.1 (s.name Func e.fmt t.dict) e.2)
+ t.assign (Basic s.name Func e.basic t.outfmt ':' t.var),
+ <UsedCall t.dict t.var>: (Used t.var1)
+    = <RmUnusedLastCall (s.name Func) (Formats e.1 (s.name Func e.fmt t.dict) e.2)
+             t.assign (Basic s.name Func e.basic t.outfmt ':' t.var1)>;
+
+*2. A built-in call is used. Its all arguments are needed.
+ t.fmts t.assign (Basic s.name Built e.basic ':' t.var),
+ <UsedCall (Dict Extern) t.var>: (Used t.var1)
+        = t.assign (Basic s.name Built e.basic ':' t.var1);
+
+*3. A block is used. Clearance of its assignment and output.
+*   The format can be used to clean final outputs inside the subgraph
+*   so we save it.
+ (Formats e.1 (s.name Subgr t.inp t.out t.dict) e.2)
+ (As e.assign) (Begin s.name e.subgr ':' t.outfmt End),
+ <UsedCall t.dict t.outfmt>: (Used t.outfmt1)
+        = (As <RmUnusedAs t.inp (As <Order e.assign>)>)
+          (Begin <RmUnused (s.name Subgr)
+                           (Formats e.1 (s.name Subgr t.inp t.out t.dict) e.2)
+                 e.subgr> ':' <ClearnOutFmt t.out t.outfmt1> End);
+
+*3. A call is unused. Just remove it.
+ t.fmts t.assign t.basic = <Save RemovedCall True>;
+}
+
+* Clearance of a last call. The call is sure used.
+* <RmUnusedLastCall s.name t.fmts t.assign t.basic>
+*   ==> t.assign' t.basic' | []
+RmUnusedLastCall {
+*1. An internal call. Clearance of its assignment and output format.
+ t.id (Formats e.1 (s.name Func t.inp t.out e.dict) e.2)
+ (As e.assign) (Basic s.name Func e.basic t.outfmt ':' t.var)
+        = (As <RmUnusedAs t.inp (As <Order e.assign>)>)
+          (Basic s.name Func e.basic
+                 <ClearnOutFmt t.out t.outfmt> ':' t.var);
+
+*2. A built-in call. Its all arguments are needed.
+ t.id t.fmts t.assign (Basic s.name Built e.basic ':' t.var)
+        = t.assign (Basic s.name Built e.basic ':' t.var);
+
+*3. A block. Clearance of its assignment and output.
+*   The format can be used to clean final outputs inside the subgraph
+*   so we save it.
+ t.id (Formats e.1 (s.name Subgr t.inp t.out e.dict) e.2)
+ (As e.assign) (Begin s.name e.subgr ':' t.outfmt End)
+        = (As <RmUnusedAs t.inp (As <Order e.assign>)>)
+          (Begin <RmUnused (s.name Subgr)
+                           (Formats e.1 (s.name Subgr t.inp t.out e.dict) e.2)
+                  e.subgr> ':'
+                  <RmUnusedOut t.id (Formats e.1 e.2) t.outfmt> End);
+}
+
+* <RmUnusedOut (s.name s.type) t.fmts t.output> ==> t.output'
+RmUnusedOut {
+ (s.name s.type) (Formats e.1 (s.name s.type t.inp (Output e.out) e.dict) e.2)
+ (Out e.assign) = (Out <RmUnusedAs (Output <Order e.out>) (Out <Order e.assign>)>);
+
+ (s.name s.type) (Formats e.1 (s.name s.type t.inp t.out e.dict) e.2)
+ (Output e.assign) = <ClearnOutFmt t.out (Output e.assign)>;
+}
+
+* Temporary definition.
+* <ClearnOutFmt t.g-outfmt t.outfmt> ==> t.outfmt'
+* <ClearnOutFmt t.outfmt> ==> t.outfmt'
+ClearnOutFmt {
+ t.g-outfmt (Output t.restr (e.out-expr':'t.var))
+    = (Output t.restr
+              (<Subs (As <FictAs t.g-outfmt (<ListVar Of Expr e.out-expr>)>)
+                      e.out-expr >':'t.var));
+ (Output t.restr (e.out-expr':'t.var))
+    = (Output t.restr
+             (<Subs (As <FictAs <ListVar Of Expr e.out-expr>>) e.out-expr>
+               ':'t.var));
+}
+
+* Create a fictitious assignment to clean an output format.
+FictAs {
+ (Output (e.val':'(Var s.t s.id Used e.var)) e.assign) (t.var1 e.vars)
+                  = (<RmUsedType t.var1> ':'t.var1) <FictAs (Output e.assign) (e.vars)>;
+ (Output t.assign1 e.assign) (t.var1 e.vars)
+                  = (XXX ':' t.var1) <FictAs (Output e.assign) (e.vars)>;
+ (Output ) () = ;
+ (Var s.t s.id Used e.var) e.vars
+                  = ((Var s.t s.id e.var) ':' (Var s.t s.id Used e.var))
+                    <FictAs e.vars>;
+ (Var e.var) e.vars = (XXX ':' (Var e.var)) <FictAs e.vars>;
+    = ;
+}
+
+RmUsedType {
+ (Var s.t s.id Used e.var) = (Var s.t s.id e.var);
+ t.var = t.var;
+}
+
+* <UsedCall t.dictionary t.out-var> ==> (Used t.var) | (UnUsed)
+UsedCall {
+ t.dict (Var s.type s.id Used e.var) = (Used (Var s.type s.id e.var));
+ (Dict Extern e.dict) t.var = (Used t.var);
+ t.dict (Output e.restr (e.expr':' (Var s.type s.id Used e.var)))
+        = (Used (Output e.restr (e.expr':' (Var s.type s.id e.var))));
+ (Dict Intern e.dict) t.var = (UnUsed);
+}
+
+* Clearance of an assignment in according to an input format.
+* <RmUnusedAs (s.Input e.assign1) (s.As e.assignment2)> ==> e.assignment
+RmUnusedAs {
+ (s.Input (e.val1 ':'(Var s.type s.id1 Used e.var)) e.inpfmt)
+ (s.As (e.val':' (Var s.type s.id e.var1)) e.assign)
+        = (e.val':' (Var s.type s.id e.var1))
+          <RmUnusedAs (s.Input e.inpfmt) (s.As e.assign)>;
+
+ (s.Input t.unused-as e.inpfmt) (s.As t.unused-as1 e.assign)
+        = <RmUnusedAs (s.Input e.inpfmt) (s.As e.assign)>;
+
+ (s.Input ) (s.As ) = ;
+}
+
+* <StartConf t.input> ==> t.assign t.basic
+StartConf {
+ (Info e.info t.fmts t.used), <GetInp GRAPH Func t.fmts>: (Input e.assign)
+    = (As e.assign) (Basic GRAPH Func <GetSaveOut GRAPH>':' (Var 'e' 0));
+}
+************* The End of the final stage of the cleaning. ******************
+
+*==== Function which can be taken from ather modeles of the scp4.===========
+/* This function initializes boxes: Graphs contains c-graphs,
+   OutFmts contains output formats, InpFmts contains input formats,
+   Zero contains a list of function that were reduced to Zero.
+*/
+* <InitBox> ==> []  final.ref: a version
+InitBox {
+  = <Br Graphs '=' > <Br OutFmts '=' > <Br InpFmts '=' > <Br Zero '=' >
+    <Br Subgr '=' 1> <Br Content '=' > <Br RemovedCall '=' False>
+    <Br Headers '=' >;
+ }
+
+* Get whole residual program.
+* <GetResids e.contents> ==> (s.graph-name e.graph) ...
+GetResids {
+ s.name e.names
+   =  ( <GetResid <Explode s.name>> ) <GetResids e.names>;
+   = ;
+}
+
+* Get a c-graph from the disk and pick up a format's imformation from it.
+* <GetResids e.file-name> ==> s.graph e.c-graph
+GetResid {
+ 'F' e.name, <Numb e.name>: s.id
+         = s.id <PickUpInfo <PickUpFmt ('F' s.id) <GetGraphF 'F' e.name>>>;
+ 'GRAPH' = <Implode 'GRAPH'>
+           <PickUpInfo <PickUpFmt ('F' GRAPH) <GraphF <GetGraphF 'GRAPH'>>>>;
+}
+
+* <GetGraphF e.file> ==> e.c-graph
+$ENTRY GetGraphF {
+e.file  = <Open 'r' <CurrFile> <OutDir> e.file>
+          <Sysfun 1 <OutDir> e.file>; }
+
+CurrFile { = 10; }
+
+GraphF { (Formats e.fmt) e.graphs = <GrFork (Formats e.fmt) <GraphF0 () e.graphs>>; }
+GraphF0 {
+ (e.grs) e.0 ((GRAPH GRAPH) e.1 Zero) e.graphs
+         = Zero <Br Headers '=' ((GRAPH GRAPH) e.1 Zero)>;
+ (e.grs) ((GRAPH s.id) e.1 Zero) e.graphs
+         = <GraphF0 (e.grs ((GRAPH s.id) e.1 Zero)) e.graphs>;
+
+ (e.grs) ((GRAPH s.id) t.fmts e.1) e.graphs
+         = '+'(e.1) <GraphF0 (e.grs ((GRAPH s.id) t.fmts)) e.graphs>;
+ (e.grs) = <Br Headers '=' e.grs>;
+}
+
+GrFork {
+ t.fmts Zero = t.fmts Zero;
+ t.fmts e.brs = t.fmts (Fork e.brs);
+}
+
+/* final.ref: A version.
+   and mark functions call as Built (external) or Func (internal).
+   It saves the format's information in InpFmts and OutFmts boxes.
+*/
+* <PickUpInfo e.c-graph> = e.c-graph
+PickUpInfo {
+ t.assign (Basic s.name e.basic) e.graph =
+*+     <PickUpFmt t.assign (Basic s.name <FunType s.name> e.basic)>
+     t.assign (Basic s.name <FunType s.name> e.basic)
+     <PickUpInfo e.graph>;
+ t.assign (Begin e.subgr ':' t.out End) e.graph = t.assign
+     (Begin <New Subgr> <PickUpInfo e.subgr> ':' t.out End) <PickUpInfo e.graph>;
+
+ (Fork e.brs) = (Fork <PickUpInfo e.brs>);
+ '+' (e.br) e.brs = '+'(<PickUpInfo e.br>) <PickUpInfo e.brs>;
+ Zero = Zero;
+ t.term e.graph = t.term <PickUpInfo e.graph>;
+                = ;
+}
+
+/* Function PickUpFmt picks up  formats from a function call.
+   It saves the formats in InpFmts and OutFmts boxes.
+*/
+* <PickUpFmt t.assign t.basic> ==> t.assign t.basic
+PickUpFmt {
+ ('F' GRAPH) (Formats e.trash) e.graph = e.graph;
+ ('F' GRAPH) (Formats e.trash) Zero = Zero;
+
+*1. A real output format. Save the format's information.
+ ('F' s.name) (Formats t.inpfmt t.outfmt) e.graph
+      = e.graph <Save InpFmts (s.name t.inpfmt)> <Save OutFmts (s.name t.outfmt)>;
+}
+
+* Type of a function name.
+* <FunType s.function-name> ==> Func | Built | Subgr
+FunType {
+ s.name, <Type s.name>:{
+   'N' e.xxx = Func;
+   'W' e.xxx, <Explode s.name>: { 'S' s.1 e.str, <Type s.1>: 'D' e.yyy = Subgr;
+                                  'GRAPH' = Func;
+                                   e.str  = Built;
+                                };
+  };
+ (s.name s.id) = <FunType s.name>;
+}
+
+****************************** Access to boxes. ****************************
+
+* Put an information to a box.  final.ref: a version.
+* <Save s.box-name t.value> ==> []
+Save {
+ Zero  s.name = <SaveZero s.name <Dg OutFmts>> <Save Zero (s.name)>;
+ Graphs (s.id e.graph), <Dg Graphs>: e.1 (s.id e.gr) e.graphs
+                     = <Br Graphs '=' e.1 (s.id e.graph) e.graphs>;
+ RemovedCall s.bool , <Dg RemovedCall>: e.1 = <Br RemovedCall '=' s.bool>;
+ s.Box (s.id e.info) = <Br s.Box '=' <ClSave s.Box <Dg s.Box> (s.id e.info)>>;
+}
+
+* An auxilary function for the function Save.
+SaveZero {
+ s.name e.outfmts (s.name e.outfmt) e.1
+                  = <Br OutFmts '=' e.outfmts (s.name Zero) e.1>;
+ s.name e.outfmts = <Br OutFmts '=' e.outfmts (s.name Zero)>;
+}
+
+* An auxilary function for the function Save. To remove repeated information.
+ClSave {
+ OutFmts e.content (s.id (Output e.restr ((Expectant)':'t.var)))
+ e.1 (s.id e.info1) = e.content (s.id e.info1) e.1;
+ OutFmts e.content (s.id (Output e.restr ((No)':'t.var)))
+ e.1 (s.id e.info1) = e.content (s.id e.info1) e.1;
+
+ s.Box e.content (s.id e.info) e.1 (s.id e.info1) = e.content (s.id e.info) e.1;
+ s.Box e.content = e.content;
+}
+
+* Get an output format of a function from the OutFmts-box.
+* <GetSaveOut s.graph-name> ==> t.output-format
+GetSaveOut {
+ GRAPH = (Output (Rs) ((Var 'e' 0)':'(Var 'e' 0)));
+ s.name, <Cp OutFmts>: e.1 (s.name t.outfmt) e.2,
+ <ExpectOut t.outfmt>: { True = <GetSaveOut GRAPH>;
+                         False = t.outfmt;
+                       };
+
+* Temporary definition. At present redundant c-graphs can be happened.
+* There are not references to them. The reason: we keep all basic
+* configurations after generalization. We cannot remove it now because
+* of the list also keeps configuration from parallel subgraphs.
+* We have to implement a stack of the basic configuration to remove
+* just from current subgraph.
+ s.name = ;
+}
+
+* Get an input format of a function from the OutFmts-box.
+* <GetSaveInp s.graph-name> ==> t.input-format
+GetSaveInp {
+* Temporary definition.
+ GRAPH = (As );
+ s.name, <Cp InpFmts>: e.1 (s.name e.inpfmt) e.2 = e.inpfmt;
+ s.name = ;
+}
+
+/* Substitution in an expression. basic.ref */
+* <Subs t.assignment-what  e.expression-where> ==> e.expression
+$ENTRY Subs { t.what e.where = <Subs1 t.what e.where>; }
+
+Subs1 {
+  t.what (Var 'c' e.var) e.where = (Var 'c' e.var) <Subs1 t.what e.where>;
+  t.what (Var e.var) e.where =
+                             <ValueV (Var e.var) t.what> <Subs1 t.what e.where>;
+  t.what ('*' e.where1) e.where =
+                            ('*' <Subs t.what e.where1>) <Subs1 t.what e.where>;
+  t.what s.symbol e.where = s.symbol <Subs1 t.what e.where>;
+  t.what /* empty */ = ;
+} /* End of Subs */
+
+* access.ref
+* <ValueVar t.var t.assignment> == (t.Possible-definition e.Value)
+$ENTRY ValueVar {
+*1. Here e.elevi == e.elevj. Variables with the same name cannot be different.
+   (Var s.type s.i e.elevi)
+   (As (e.valuei':'(Var s.type s.i e.elevj)) e.ass) = (() e.valuei);
+
+*2. Variables are different.
+   t.vari (As (e.valuej':'t.varj) e.ass) = <ValueVar t.vari (As e.ass)>;
+
+*3. If absent, its value is itself. Include definition.
+   t.vari (As /* empty */ ) = ( ((Def (t.vari':'t.vari) )) t.vari );
+} /* End of ValueVar */
+
+* <ValueV t.var t.assignment> ==> e.expression
+$ENTRY ValueV {
+  t.var t.assignment = <Value <ValueVar t.var t.assignment>>;
+} /* End of ValueV */
+
+Value {
+  (t.Possible-definition e.value) = e.value;
+} /* End of Value */
+
+* <ExpectOut t.output-format> == True | False
+ExpectOut {
+ (Output t.restr ((No)':'t.var)) = True;
+ (Output t.restr ((Expectant)':'t.var)) = True;
+ (Output e.outfmt) = False;
+}
+
+ClearVar {
+ e.1 t.var e.2 t.var e.vars = e.1 <ClearVar t.var e.2 e.vars>;
+ e.vars = e.vars;
+}
+
+* <ListVar Of s.where e.situation> ==> e.var-list
+$ENTRY ListVar {
+ Of s.where e.expr = <ClearVar <ListVar1 Of s.where e.expr>>;
+}
+
+$ENTRY ListVar1 {
+ Of Situation (Call e.id (t.call':'t.hvar)) e.stack =
+                  <ListVar1 Of Expr t.call> <ListVar1 Of Situation e.stack>;
+* Applicative case.
+ Of Situation (Conf e.stack (Conf e.conf))
+                             = <ListVar1 Of Situation e.stack (Conf e.conf)>;
+ Of Situation (Conf (e.conf':'t.out-var)) = <ListVar1 Of Expr e.conf>;
+ Of Situation  = ;
+
+ Of Stack e.stack = <ListVar1 Of Situation e.stack>;
+
+ Of Expr (Var 'h' e.var) e.expr = <ListVar1 Of Expr e.expr>;
+ Of Expr (Var 'c' e.var) e.expr = <ListVar1 Of Expr e.expr>;
+ Of s.Expr (Var s.type e.var) e.expr =
+             (Var s.type e.var) <ListVar1 Of s.Expr e.expr>;
+ Of s.Expr ('!' (Fn s.f (e.expr1':'t.var1) e.arg)':'t.var) e.expr =
+             <ListVar1 Of s.Expr e.expr1 ('!' (Fn s.f e.arg)':'t.var) e.expr>;
+ Of s.Expr ('!' (Fn s.f)':'t.var) e.expr = <ListVar1 Of s.Expr e.expr>;
+ Of s.Expr ('*' e.expr1) e.expr = <ListVar1 Of s.Expr e.expr1 e.expr>;
+ Of s.Expr (Expectant) e.expr = <ListVar1 Of s.Expr e.expr>;
+ Of s.Expr (No) e.expr = <ListVar1 Of s.Expr e.expr>;
+ Of s.Expr s.1 e.expr = <ListVar1 Of s.Expr e.expr>;
+ Of s.Expr  = ;
+}
+
+$ENTRY IdAss {
+ From Vars e.vars = (As <MkAss From Expression e.vars>);
+ From Vars1 e.vars = <MkAss From Expression e.vars>;
+}
+
+MkAss {
+ From Expression  ('*' e.expr1) e.expr = <MkAss From Expression e.expr1 e.expr>;
+ From Expression  (Var 'h' e.var) e.expr = <MkAss From Expression e.expr>;
+ From Expression  (Var 'c' e.var) e.expr = <MkAss From Expression e.expr>;
+ From Expression  (Var s.type e.var) e.expr =
+     ((Var s.type e.var)':'(Var s.type e.var)) <MkAss From Expression e.expr>;
+ From Expression  s.1 e.expr = <MkAss From Expression e.expr>;
+ From Expression  = ;
+}
+
+* access.ref
+$ENTRY New {
+ s.name, <Dg s.name>: s.number
+         = s.number <Br s.name '=' <Add s.number 1>>
+}
+
+* access.ref
+* Get an output variable from an output format.
+* <GetOutVar t.out> ==> t.var
+$ENTRY GetOutVar {
+ (Output t.restr (e.expr':'t.var)) = t.var;
+}
+
+* cgr54.ref
+MstScheme {
+ ,<GetGraphF 'mst.scp'>: (Node e.node (Stack e.stack) t.basic),
+ <Order <ListVar Of Situation e.stack>>: e.contrs = e.contrs
+              <Save Formats 'F' GRAPH (As <ConjAssign e.contrs>)
+                         (Output (Rs) ((Var 'e' 0)':'(Var 'e' 0)))>;
+}
+
+* Ordering of an assignment up to names-numbers of variables to be assigned.
+Order {
+ t.term e.1 = <Order1 (t.term) '^' e.1>;
+            = ;
+ }
+
+Order1 {
+* Assignment.
+ (e.1 (e.expr':'t.var)) '^' (e.expr1':'t.var1) e.2,
+ <VarLess t.var t.var1>: True
+         = <Order1 (e.1 (e.expr':'t.var) (e.expr1':'t.var1)) '^' e.2>;
+* Variables.
+ (e.1 (Var e.var)) '^' (Var e.var1) e.2,
+ <VarLess (Var e.var) (Var e.var1)>: True
+         = <Order1 (e.1 (Var e.var) (Var e.var1)) '^' e.2>;
+
+ (e.1 t.term) '^' t.term1 e.2 = <Order1 (e.1) '^' t.term1 t.term e.2>;
+ () '^' t.term e.2 = <Order1 (t.term) '^' e.2>;
+ (e.1) '^' = e.1;
+ }
+
+EqVars {
+ (Var s.type s.id e.var) (Var s.type s.id e.var1) = True;
+ t.var t.var1 = False;
+}
+
+* A predicate "Is the first variable less than the second."
+* Our natural odering is the odering up to number-names.
+* <VarLess t.var1 t.var2> ==> True | False
+VarLess {
+ (Var s.type1 s.name1 e.var1) (Var s.type2 s.name2 e.var2),
+       <Sub s.name1 s.name2>: { '-' e.sub = True;
+                                    e.sub = False;
+                              };
+} /* End of VarLess */
+
+ConjAssign {
+ (Ct t.var':'e.expr) e.contrs = (e.expr':'t.var) <ConjAssign e.contrs>;
+   = ;
+}
+
+* access.ref
+* <GetOutFmt t.out> ==> e.expr
+$ENTRY GetOutFmt {
+ t.outfmt = <SelfOut t.outfmt>;
+}
+
+SelfOut {
+  (Output t.restr ((Expectant)':'t.var)) t.out-var = t.out-var;
+  (Output t.restr ((No)':'t.var)) t.out-var = t.out-var;
+  (Output t.restr (e.out-expr ':'t.var)) t.out-var = e.out-expr;
+  (Output t.restr (e.out-expr ':'t.var))
+               = <SelfOut (Output t.restr (e.out-expr ':'t.var)) t.var>;
+ }
+
+******************************** trace.ref ************************
+$ENTRY ReName {
+  s.name , <Type s.name>:
+     {'N' e.xxx = 'F' <Symb s.name>;
+       e.xxx    = <Explode s.name>;
+     };
+}
+
+$ENTRY DiskOutF {
+  s.name e.expr = <FOutput (<OutDir> <ReName s.name>) 0 e.expr>;
+
+/*+
+  s.name e.expr = <Open 'w' <CurrFile> <OutDir> <ReName s.name>>
+                  <FOutput 0 e.expr>;
+*/
+}
+
+DiskOutF0 {
+  GRAPH t.fmts e.expr
+                = <DiskOutF GRAPH t.fmts <RefGraphs (<Dg Headers>) e.expr>>;
+  s.name e.expr = <DiskOutF s.name e.expr>;
+}
+
+RefGraphs {
+ ( ((GRAPH GRAPH) e.1 Zero) e.heads) (Fork e.brs)
+     = ((GRAPH GRAPH) e.1 Zero);
+
+ ( ((GRAPH s.id) e.1 Zero) e.heads) (Fork e.brs)
+     = ((GRAPH s.id) e.1 Zero) <RefGraphs (e.heads) (Fork e.brs)>;
+
+ ( ((GRAPH s.id) t.fmts) e.heads) (Fork '+'(e.br) e.brs)
+     = ((GRAPH s.id) t.fmts e.br) <RefGraphs (e.heads) (Fork e.brs)>;
+ () (Fork) = ;
+}
+
+$ENTRY Diskout {
+  ('content.int') e.expr = <FOutput (<OutDir> 'content.int') 0 e.expr>;
+*+       <Open 'w' <CurrFile> <OutDir> 'content.int'> <FOutput 0 e.expr>;
+}
+
+$ENTRY FOutput {
+ (e.file) 0 e.X = <DeSysfun e.file (75 e.X)>;
+*+ 0 e.X = <Cut-Put <ConS e.X>>;
+ };
+
+
+/*+
+* CONvert to a String. New Syntax.
+ConS {
+  s.A e.1, <Type s.A>:
+       {
+        'W' e.A1 = <WORD <String (Word NoQuote) <Explode s.A>>> ' ' <ConS e.1>;
+        'N'  e.A1 = <Symb s.A> ' ' <ConS e.1>;
+        s.T  e.A1 = '\''<String (Chars NoQuote) s.A e.1>;
+       };
+  (e.1) e.2 = '(' <ConS e.1> ')' <ConS e.2>;
+            = ;
+     };
+
+WORD {
+ e.word Quote = '\"' e.word '\"';
+ e.word NoQuote = e.word ;
+}
+
+String {
+ (s.flag e.Quote) '\\' e.1 = '\\' '\\' <String (s.flag Quote) e.1>;
+ (s.flag e.Quote) '\'' e.1 = '\\' '\'' <String (s.flag Quote) e.1>;
+ (s.flag e.Quote) '\"' e.1 = '\\' '\"' <String (s.flag Quote) e.1>;
+ (s.flag e.Quote) '\t' e.1 = '\\' 't'  <String (s.flag Quote) e.1>;
+ (s.flag e.Quote) '\n' e.1 = '\\' 'n'  <String (s.flag Quote) e.1>;
+ (s.flag e.Quote) '\r' e.1 = '\\' 'r'  <String (s.flag Quote) e.1>;
+ t.flag s.A e.1, <Type s.A>:
+       {
+        'W' e.Word   = <String t.flag>
+                       <WORD <String (Word NoQuote) <Explode s.A>>> ' ' <ConS e.1>;
+        'N' e.Number = <String t.flag> <Symb s.A> ' ' <ConS e.1>;
+        'L' e.Letter = s.A <String t.flag e.1>;
+        'D' e.Digit  = s.A <String t.flag e.1>;
+        'P' e.Printable = s.A <String t.flag e.1>;
+        s.T e.A1, t.flag: (s.flag e.Quote)
+                        = '\\x' <ToHex <Ord s.A>> <String (s.flag Quote) e.1>;
+       };
+
+ t.flag (e.1) e.2 = <String t.flag> '(' <ConS e.1> ')' <ConS e.2>;
+ (Word  s.Quote) = s.Quote;
+ (Chars e.Quote) = '\'';
+}
+
+ToHex {
+ s.digit, <Divmod (s.digit) 16>: (s.q) s.r = <ToHexDig s.q> <ToHexDig s.r>;
+}
+
+ToHexDig {
+ 15 = 'F'; 14 = 'E';
+ 13 = 'D'; 12 = 'C';
+ 11 = 'B'; 10 = 'A'; s.d = <Symb s.d>;
+}
+*/
+
+/* Old Syntax.
+* CONvert to a String
+ConS {
+  '#'e.1 = '##' <ConS e.1>;
+  '('e.1 = '#(' <ConS e.1>;
+  ')'e.1 = '#)' <ConS e.1>;
+  s.A e.1, <Type s.A>:
+       {'F's.A = '#' <Explode s.A> ' ' <ConS e.1>;
+        'N's.A = '#' <Symb s.A> ' ' <ConS e.1>;
+        s.T s.A = s.A <ConS e.1>;
+       };
+  (e.1)e.2 = '(' <ConS e.1> ')' <ConS e.2>;
+  = ;
+     };
+*/
+
+* CUT the arg. into 75-pieces and PUT in file
+Cut-Put{
+  = ;
+  e.X, <First 75 e.X>:{(e.1)   = <Putout <CurrFile> e.1>;
+                     (e.1)e.2 = <Putout <CurrFile> e.1> <Cut-Put e.2>;
+                    };
+       };
+
+*==============================================================
+* final.ref
+****************** Final pretty print of residual graphs. ******************
+* Print of a list of residual graphs.
+* <FinalOutGraphs t.fmts (t.id-graph e.graph) ...> ==> []
+FinalOutGraphs {
+ t.fmts (GRAPH e.graph) e.graphs
+    = <Br Graphs '=' e.graphs>
+      <FinalOutGraphs1 t.fmts (GRAPH e.graph) e.graphs <GetContent () e.graph>>;
+}
+
+FinalOutGraphs1 {
+ t.fmts (s.name e.graph) e.graphs t.content
+        = <FinalOutGraph t.fmts t.content (s.name e.graph)>
+          <FinalOutGraphs1 t.fmts e.graphs t.content>;
+ t.fmts (e.content) = <Diskout ('content.int') <ReNames e.content>>;
+}
+
+* A version.
+* Output of a residual c-graph into the trace-file, screen
+* and the scpout directory.
+FinalOutGraph {
+  t.fmts (e.1 s.name e.content) (s.name e.graph), <NumbName s.name>:
+    { s.id, t.fmts : ((FormalInps e.3 (s.id t.inp) e.inps)
+                      (FormalOuts e.4 (s.id t.out) e.outs))
+            = <DiskOutF0 s.name (Formats t.inp t.out) e.graph>;
+    };
+  t.fmts t.content t.graph = ;
+}
+
+NumbName {
+ GRAPH = GRAPH;
+ s.name = s.name;
+}
+
+* <GetContent t.history e.graph>
+GetContent {
+*1. An internal reference belongs to the history .
+ (e.1 s.name e.history) t.assign (Basic s.name Func e.basic) e.graph =
+     <GetContent (e.1 s.name e.history) e.graph>;
+
+*2. An internal reference does not belong to the history .
+ (e.history) t.assign (Basic s.name Func e.basic) e.graph =
+     <GetContent (e.history s.name) <GetSaveGraph s.name> e.graph>;
+
+ t.history (Begin e.subgr ':' t.out End) e.gr
+                             = <GetContent t.history e.subgr e.gr>;
+ t.history (Fork e.brs) e.gr = <GetContent t.history e.brs e.gr>;
+ t.history '+' (e.br) e.brs = <GetContent t.history e.br e.brs>;
+
+ t.history t.term e.graph = <GetContent t.history e.graph>;
+ (e.history)  = (e.history GRAPH);
+}
+
+ReNames {
+ s.name e.names = <Implode <ReName s.name>> <ReNames e.names>;
+ = ;
+}
+********************* The End of the final pretty print. ********************

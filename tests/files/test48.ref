@@ -1,0 +1,681 @@
+* WARNING.REF (inref4.ref)
+* version 1.10.99, new
+* Looking for errors and warnings in a parsed program as well as forming
+* a message listing about.
+
+* $ENTRY PrList, InitStr, InitSent, New, Set, Flags, InitBox, CheckName;
+* $ENTRY NewMessage, NextSent, IsUpper, IsFuncName, CheckRedef, PutExtern, PutCall;
+* $ENTRY IsExtern, ThereAreTVar, FuncToUpper;
+
+* difful4.ref
+$EXTRN ADDR;
+
+* inform.ref
+$EXTRN InrForm, NewFun;
+
+* diskout4.ref
+$EXTERN ListOut;
+
+* key.ref
+$EXTRN SUBDIR, HEREDIR, Executable, Scp4Version;
+
+* $INTERIOR ;
+
+* An help how to execute the translator.
+$ENTRY Help {
+ Inref-help =
+        <Prout 'The required arguments are (in this order):'>
+	<Prout 'file name for the source'>
+*+	<Prout 'directory name for the results'>
+        <Help>;
+
+ Mst-help =
+       <Prout 'The required arguments are (in this order):'>
+       <Prout 'file name for the mst-scheme'>
+*+       <Prout 'directory name for the result'>
+       <Help>;
+
+  =
+        <Prout '[ /flag ]' >
+        <Prout ', where the flags can be:'>
+        <Prout '         /t   --treatment of t-variables as t.X is equal to (e.X) ;'>
+        <Prout '         /l   --put a message listing to this_file.lis;'>
+        <Prout '         /w   --warnings;'> <ExitErr>;
+
+       }
+
+
+$ENTRY Warning {
+ 't.' s.name Variable = <Warn-tVar 't.' <OldVarId s.name>>;
+ 't'  s.name Variable = <Warn-tVar 't' <OldVarId s.name>>;
+ e.message = <SaveWarn e.message>;
+}
+
+Warn-tVar {
+ 't' e.id = <SaveWarn 't' e.id ' variable was replaced with ' ('e' e.id)>;
+}
+
+
+$ENTRY Error {
+*1. Parser error.
+ (Passed e.1) (Unpassed EOF)
+        = <FinMess <New Err> 'Unexpected end of file!'>;
+ (Passed e.1) (Unpassed 0 e.2)
+        = <Error (Passed e.1) (Unpassed EOF)>;
+
+ (Passed Basics) (Uppassed e.2)
+               = <Error 'Error in $Basic declaration: ' e.2 '.         '
+                        'The required formats are: '
+                        '<Fun_Name (arg1) ... (argN) >, '
+                        'where argI is any expression with '
+                        'function calls in the same format.'>;
+
+ (Passed Declaration s.decl) (Uppassed e.2)
+               = <Error 'Error in $' <Explode s.decl> ' declaration: ' e.2>;
+ (Passed '$EXTERN ' e.1) (Uppassed e.2)
+               = <Error 'Error in $EXTERN declaration: ' e.2>;
+ (Passed '$EXECUTABLE ' e.1) (Uppassed e.2)
+               = <Error 'Error in *$EXECUTABLE declaration: ' e.2>;
+ (Passed (Mst e.strs1)) (Unpassed )
+               = <Error 'Error in a broken multi-level MST-scheme:'
+                        ' lines ' e.strs1 ' are expected to be continued'
+                 >;
+ (Passed (Mst )) (Unpassed e.strs2)
+               = <Error 'Error in a broken multi-level MST-scheme:'
+                        ' lines ' e.strs2 ' continue nothing'
+                 >;
+ (Passed NextStr) (Unpassed '*' e.1)
+               = <Error 'Comments are not allowed between lines '
+                        'inside multi-level MST-scheme: ' '*' e.1>;
+ (Passed NextStr) (Unpassed '/*' e.1)
+               = <Error 'Comments are not allowed between lines '
+                        'inside multi-level MST-scheme: ' '/*' e.1>;
+ (Passed StringUp e.passed) (Unpassed (e.2)(e.1))
+        = <Error 'An hinder in a upper line:' Up(e.2) Down(e.1)>;
+ (Passed VarUp e.passed) (Unpassed (e.2)(e.1))
+        = <Error 'Unexpected symbol under a variable:' Up(e.2) Down(e.1)>;
+ (Passed VarDn e.passed) (Unpassed (e.2)(e.1))
+        = <Error 'Unexpected symbol over a variable:' Up(e.2) Down(e.1)>;
+ (Passed QuoteUp e.passed) (Unpassed (e.2)(e.1))
+        = <Error 'Unexpected symbol over a quoted string:' Up(e.2) Down(e.1)>;
+
+ (Passed e.1) (Unpassed '{' e.2)
+        = <Error 'Unexpected left curl bracket. {' e.2>;
+*+        = <Error 'Unexpected left curl bracket. Block is not allowed. {' e.2>;
+ (Passed e.1) (Unpassed ')' e.2)
+        = <Error 'Unexpected right structure bracket: )' e.2>;
+ (Passed e.1) (Unpassed '>' e.2)
+        = <Error 'Unexpected right angle bracket: >' e.2>;
+ (Passed e.1) (Unpassed ',' e.2) = <Error 'Unexpected comma ,' e.2>;
+ (Passed e.1) (Unpassed ':' e.2) = <Error 'Unexpected colon :' e.2>;
+ (Passed e.1) (Unpassed '=' e.2) = <Error 'Unexpected =' e.2>;
+ (Passed e.1) (Unpassed '/*' e.2)
+        = <Error 'Comment was not closed: /*' e.2>;
+ (Passed (e.1'*')(s.F) e.3) (Unpassed s.L e.2)
+        = <Error 'Right angle bracket is expected: ' s.L e.2>;
+ (Passed (e.1)'!' Fn s.Fun e.3) (Unpassed s.L e.2)
+        = <Error 'Right angle bracket is expected: ' s.L e.2>;
+
+ (Passed (e.1) Declaration (s.decl e.4) e.3) (Unpassed e.2)
+        = <Error 'Error in declaration $' s.decl e.2>;
+ (Passed (e.1)e.3) (Unpassed e.2)
+        = <Error 'Right structure bracket is expected: ' e.2>;
+
+ (Passed '$;' e.1) (Unpassed e.2)
+        = <Error 'Expected , or = or ; or } inside: ' e.2>;
+ (Passed '$=' e.1) (Unpassed e.2)
+        = <Error 'Expected , or = or : or } inside: ' e.2>;
+
+ (Passed '\"' e.1) (Unpassed )
+        = <Error 'Right  \"  is expected: \"' e.1>;
+ (Passed '\'' e.1) (Unpassed )
+        = <Error 'Right  \'  is expected: \'' e.1>;
+ (Passed s.Q e.1) (Unpassed '\\' e.2)
+        = <Error 'Unexpected escape sequence: \\' e.2>;
+ (Passed e.1) (Unpassed '/*') = <Error '*/ is expected'>;
+
+ (Passed e.1) (Unpassed e.2)  = <Error 'Syntax error: ' e.2>;
+
+ e.message = <SaveErr e.message>;
+}
+
+$ENTRY CheckLeft { e.pattern = <CheckPatt e.pattern>; }
+CheckPatt {
+ e.pattern,
+ <CheckPatt1 (Defined <Dg Vars>) e.pattern>: (Defined e.vars)
+      = <CheckRpId e.vars> <Br Vars '=' e.vars>;
+}
+
+* <CheckPatt1 (Defined e.vars) e.pattern> == (Defined e.vars)
+CheckPatt1 {
+*1. Open e-variable is encountered.
+ (Defined e.vars) e.1 '*E' s.id e.2 '*E' s.id1 e.patt =
+*            <Error 'Open e.' <OldVarId s.id> '-variable'>
+            <CheckPatt1 (Defined e.vars) e.1 ('*E' s.id) e.2 '*E' s.id1 e.patt>;
+
+*2. Repeated s-variable is encountered. Do nothing.
+ (Defined e.vars ('*S' s.id) e.1) '*S' s.id e.patt
+          = <CheckPatt1 (Defined e.vars ('*S' s.id) e.1) e.patt>;
+
+*3. Repeated e-variable is encountered.
+ (Defined e.vars ('*E' s.id) e.1) '*E' s.id e.patt  =
+*+            <Error 'Repeated e.' <OldVarId s.id> '-variable'>
+            <CheckPatt1 (Defined e.vars ('*E' s.id) e.1) e.patt>;
+
+*4. Repeated t-variable is encountered.
+ (Defined e.vars ('*T' s.id) e.1) '*T' s.id e.patt =
+*+            <Error 'Repeated t.' <OldVarId s.id> '-variable'>
+            <CheckPatt1 (Defined e.vars ('*T' s.id) e.1) e.patt>;
+*5. New variable is encountered. Keep it as defined.
+ (Defined e.vars) '*S' s.id e.patt
+          = <CheckPatt1 (Defined e.vars ('*S' s.id)) e.patt>;
+ (Defined e.vars) '*E' s.id e.patt
+          = <CheckPatt1 (Defined e.vars ('*E' s.id)) e.patt>;
+ (Defined e.vars) '*T' s.id e.patt
+          = <CheckPatt1 (Defined e.vars ('*T' s.id)) e.patt>;
+
+*6. Function call is encountered.
+ t.Def-vars '*'((s.F) e.call) e.patt
+          = <Error 'Unexpected  call to ' s.F 'function in left part'>
+            <CheckPatt1 t.Def-vars e.patt>;
+*7. Parenthesis is encountered.
+ t.Def-vars (e.patt1) e.patt
+          = <CheckPatt1 <CheckPatt1 t.Def-vars e.patt1> e.patt>;
+*8. Symbol is encountered.
+ t.Def-vars s.symb e.patt = <CheckPatt1 t.Def-vars e.patt>;
+*9. Exit.
+ t.Def-vars = t.Def-vars;
+}
+
+
+CheckRpId {
+ ('*' s.type s.id) e.vars ('*' s.type2 s.id) e.1
+      = <Warning 'The same index ' <OldVarId s.id> ' for different variables'>
+        <CheckRpId e.vars e.1>;
+  e.vars = ;
+}
+
+
+CheckExprR { s.side e.expr = <CheckExprR1 s.side (Defined <Cp Vars>) e.expr>; }
+
+* <CheckExprR1 s.side (Defined e.vars) e.expr> == []
+CheckExprR1 {
+*1. Variable is defined. Do nothing.
+ s.side (Defined e.vars ('*' s.type s.id) e.1) '*' s.type s.id e.expr
+     = <CheckExprR1 s.side (Defined e.vars ('*' s.type s.id) e.1) e.expr>;
+
+*2. Variable is not defined.
+ s.side t.Def-vars '*S' s.id e.expr
+          = <Error 'Variable s.'<OldVarId s.id> ' is undefined'>
+            <CheckExprR1 s.side t.Def-vars e.expr>;
+ s.side t.Def-vars '*E' s.id e.expr
+          = <Error 'Variable e.' <OldVarId s.id> ' is undefined'>
+            <CheckExprR1 s.side t.Def-vars e.expr>;
+ s.side t.Def-vars '*T' s.id e.expr
+          = <Error 'Variable t.' <OldVarId s.id> ' is undefined'>
+            <CheckExprR1 s.side t.Def-vars e.expr>;
+
+*3. Function call is encountered.
+/*
+ Left  t.Def-vars '*'((s.F) e.expr1) e.expr
+          = <Error 'Nested call is not allowed in left part'>
+            <CheckExprR1 Left t.Def-vars e.expr1 e.expr>;
+ Right t.Def-vars '*'((s.F) e.expr1) e.expr
+          = <CheckExprR1 Right t.Def-vars e.expr1 e.expr>;
+*/
+ s.side t.Def-vars '*'((s.F) e.expr1) e.expr
+          = <CheckExprR1 Right t.Def-vars e.expr1 e.expr>;
+
+*4. Parenthesis is encountered.
+ s.side t.Def-vars (e.expr1) e.expr
+                   = <CheckExprR1 s.side t.Def-vars e.expr1 e.expr>;
+*5. Symbol is encountered.
+ s.side t.Def-vars s.symb e.expr = <CheckExprR1 s.side t.Def-vars e.expr>;
+*6. Exit.
+ s.side t.Def-vars = ;
+}
+
+$ENTRY CheckRight {
+*1. Call on the left side.The call is not last.
+ '*,' e.call '*,' e.calls = <CheckCall e.call> <CheckRight '*,' e.calls>;
+
+*2. Block on the left side.The call is not last.
+ '*,' e.call '*{'(e.block) = <CheckCall e.call> <CheckBlock e.block>;
+
+*3. Last call on the left side.
+ '*,' e.call '*=' e.expr = <CheckCall e.call> <CheckRight '*=' e.expr>;
+
+*4. No call on the left side.
+  '*=' e.expr = <CheckExprR Right e.expr> <NewSent>;
+
+}
+
+CheckBlock {
+ e.block =
+     <Br Block '=' <Cp Vars>> <CheckBlock1 e.block> <Nil <Dg Block>>;
+}
+
+Nil { e.1 = ; }
+
+CheckBlock1 {
+ (e.L)'='(e.R)';' e.block
+    = <CheckLeft e.L> <CheckRight e.R> <CheckBlock1 e.block>;
+    = ;
+';' = <Error 'Empty block'> <NewSent>;
+e.syntax-error = ;
+}
+
+CheckCall {
+/*
+ e.call '*:' '*S' s.id  = <CheckCall1 e.call> <CheckPattC '*S' s.id>;
+ e.call '*:' '*E' s.id  = <CheckCall1 e.call> <CheckPattC '*E' s.id>;
+ e.call '*:' '*T' s.id  = <CheckCall1 e.call> <CheckPattC '*T' s.id>;
+*/
+ e.call '*:' e.pattern = <CheckCall1 e.call> <CheckPattC e.pattern>;
+*                 <Error 'Pattern is not allowed after a left call '>;
+ e.trash = <Error 'Incorrect expression after comma: ' e.trash>;
+}
+
+CheckPattC {
+* '*' s.Type s.id = <CheckPatt '*' s.Type s.id>;
+ e.pattern = <CheckPatt e.pattern>;
+}
+
+CheckCall1 {
+/*
+ '*'((sF) e.args) = <CheckExprR Left e.args>;
+  e.expr = <Error 'Incorrect expression after comma'>;
+*/
+ e.expr = <CheckExprR Left e.expr>;
+}
+
+NewSent {
+*+  = <NewMessage 'Function ' <Cp CurrentFun>>  <Set Vars '=' >
+  = <NewMessage 'Function ' <Cp CurrentFun>>  <Set Vars '=' <Cp Block>>
+    <Set CurrentString '=' <InitStr>> <Set CurrentSentence '=' <NextSent>>;
+}
+
+$ENTRY NewMessage {
+ e.message , <Cp CurrentSentence>: (s.id e.sent), <Dg Listing>:
+  {     = ;
+    e.1 ('Error' e.err) e.ms = <PrMessage e.message ' Sentence #' s.id ':'>
+                               <NewMessages e.1 ('Error' e.err) e.ms>;
+    e.warnings, <PrWarn>: True = <PrMessage e.message ' Sentence #' s.id ':'>
+                                 <NewMessages e.warnings>;
+    e.warnings = ;
+  };
+
+}
+
+$ENTRY NextSent { , <Dg CurrentSentence>:
+  { (s.numb  e.sentence) = (<Add (s.numb) 1> );
+                         = <InitSent>;
+  };
+}
+
+$ENTRY InitSent { = (1    /* []    */ ); }
+
+$ENTRY InitStr { , <Dg CurrentString>:
+  { (s.numb  e.str) = (<Add (s.numb) 1> );
+                    = (1   /*  []    */ );
+  };
+}
+
+* Numbering of variables start with 20.
+InitVar { = <Br VarInd '=' 20> ; }
+* Numbering of parametrs start with 1.
+InitPar { = <Br ParInd '=' 1> ; }
+
+NewMessages {
+  = ;
+ (e.mes1) e.messages = <PrMessage e.mes1> <NewMessages e.messages>;
+}
+
+
+PrMessage {
+ 'Warning' e.message, <PrWarn>:
+  { True = <OutMessage 'Warning' e.message>;
+    False = ;
+  };
+ e.message = <OutMessage e.message>;
+}
+
+* Do print wargings ?
+PrWarn {
+ , <Flags>: e.1 ('/w') e.2 = True;
+                           = False;
+}
+
+* Do print listing into a file ?
+$ENTRY PrList {
+ , <Flags>: e.1 ('/l') e.2 = True;
+                           = False;
+}
+
+* Are there t-variables ?
+$ENTRY ThereAreTVar {
+ , <Flags>: e.1 ('/t') e.2 = No;
+                           = Yes;
+}
+
+$ENTRY New {
+ s.Box, <Dg s.Box>:s.numb = s.numb <Br s.Box '=' <Add (s.numb) 1>>;
+}
+
+SaveWarn {
+ e.message, <Dg Listing>: e.list
+ = <Br Listing '=' e.list ('Warning #' <New Warn> ': ' e.message '!')>;
+}
+
+SaveErr {
+ e.message, <Dg Listing>: e.list
+ = <Br Listing '=' e.list ('Error #' <New Err> ': ' e.message '!')>;
+}
+
+OutMessage {
+ e.message = <Prout e.message> <DiskMess <PrList> e.message>;
+}
+
+DiskMess {
+ True e.message = <ListOut e.message>;
+ e.false = ;
+}
+
+$ENTRY FinalMessage { , <Cp Err>: s.err-cnt
+ = <CheckUndef>
+   <FinMess <Dg Warn> 'syntax warnings found!'>
+   <FinMess s.err-cnt 'syntax errors found!'>;
+}
+
+FinMess {
+ 1   'Unexpected end of file!'
+              = <OutMessage 1 'Error: Unexpected end of file!'> <ExitErr>;
+ 1   e.errors = ;
+ 2   e.error 's found!' = <FinMess 2 e.error ' found!'>;
+ s.n 'syntax warn' e.1, <PrWarn>:
+  { True = <OutMessage <Sub (s.n)1> 'syntax warn' e.1>;
+    False = ;
+  };
+ s.n e.errors = <OutMessage <Sub (s.n)1> e.errors> <ExitErr>;
+}
+
+$ENTRY ExitErr { = <Exit 254>; }
+
+* We concatinate '1' to each variable's name.
+* The reason: there are a specific names for variables inside
+* inref - e.1 and e.2. So we generate names with at least two
+* characters.
+OldVarId {
+ s.id, <Type s.id>:
+   { 'N' e.xxx = <OldVarId1 <Cp CmpType> <Symb s.id>>;
+     'W' e.xxx = <OldVarId1 <Cp CmpType> <Explode s.id>>;
+   };
+
+}
+
+OldVarId1 {
+ Inref e.name '1' = e.name;
+ Mst   e.name = e.name;
+}
+
+* Error in built-in Rp. So it is just redefinition.
+$ENTRY Set {
+ s.Box '=' e.new, <Dg s.Box>:e.old = <Br s.Box '=' e.new>;
+}
+
+$ENTRY PutExtern {
+ '$EXTERN ' e.1 , <Dg Extern>:e.old = <Br Extern '=' <Cl e.old e.1>>;
+ '$EXECUTABLE ' e.1 , <Dg Execut>:e.old = <Br Execut '=' <Cl e.old e.1>>;
+ '$PutInHistory ' e.1, <Dg Key>: e.2 (PutInHistory e.old) e.3
+                     = <Br Key '=' e.2 (PutInHistory <Cl e.old e.1>) e.3>;
+ '$GoAhead ' e.1, <Dg Key>: e.2 (GoAhead e.old) e.3
+                     = <Br Key '=' e.2 (GoAhead <Cl e.old e.1>) e.3>;
+
+ '$STRATEGY '  e.1 = <PutKey Strategy (Lazy Applicative) e.1>;
+ '$TRANSIENT ' e.1 = <PutKey Transient (Yes No) e.1>;
+ '$SIMPLIFY '  e.1 = <PutKey Simplify (Yes No) e.1>;
+ '$CallDepth ' e.1 = <PutKey CallDepth () e.1>;
+ '$DEPTH ' e.1   =  <PutKey Depth () e.1>;
+ '$LENGTH ' e.1  = <PutKey Length () e.1>;
+ '$MstFromEntry ' e.1 = <PutMstEntry e.1>;
+ '$Version ' e.1, <Scp4Version>:
+             { e.1 = ;
+               e.version = <Warning 'The Scp4 version (' e.version
+                                    ') differs from what you declared to ' (e.1) ' .' >;
+             };
+}
+
+PutKey {
+ s.key e.1, <Dg Key>:
+     { e.3 (s.key e.2) e.4 = <Error 'Redefinition of ' s.key '-key!'>;
+       e.3 = <PutKey1 s.key e.1 (e.3)>;
+     };
+}
+
+PutKey1 {
+ s.key () s.1 (e.2), <Type s.1>:
+   { 'N' e.x = <Br Key '=' e.2 (s.key s.1)>;
+      e.trash = <Error 'Incorrect value of ' s.key '-key: ' s.1>;
+   };
+ s.key (e.1 s.x e.11) s.x (e.2) = <Br Key '=' e.2 (s.key s.x)>;
+ s.key (e.11) e.1 (e.2) = <Error 'Incorrect value of ' s.key '-key: ' e.1>;
+}
+
+PutMstEntry {
+ e.1, <Dg MstEntry>: e.x = <Br MstEntry '=' Yes>;
+}
+
+PutEntry {
+ e.1, <Dg Entry>: Yes  = <Br Entries '=' <Dg Entries> e.1> <Set Entry '=' No>;
+ e.1 = ;
+}
+
+$ENTRY IsExtern {
+ Const__ = False;
+ UnConst__ = False;
+ Appl__ = False;
+ Cut__ = False;
+ s.N , <Cp Extern>:e.1 s.N e.extern = True;
+ s.N = False;
+}
+
+Cl {
+ e.1 t.x e.2 t.x e.3 = e.1 <Cl t.x e.2 e.3>;
+ e.1 = e.1;
+}
+
+$ENTRY PutCall { s.Fn , <Dg ListCall>:
+  {e.calls s.Fn e.1 = <Br ListCall '=' e.calls s.Fn e.1>;
+   e.calls = <Br ListCall '=' e.calls s.Fn>;
+  };
+}
+
+$ENTRY Flags { = (<Arg 2>) (<Arg 3>) (<Arg 4>) (<Arg 5>) (<Arg 6>);}
+
+* Initialization.
+$ENTRY InitBox {
+ s.type = <Br CmpType '=' s.type>
+          <InitVar> <InitPar>
+          <Br ListFun '=' >    /* Function list. */
+          <Br Extern '=' <ExtList> Trans___ Equal___ Open___>  /* Function list. */
+          <Br Execut '=' <Executable> Equal___ Open___  >  /* Function list. */
+          <Br ExternBody '=' >            /* Bodis of external functions.   */
+          <Br ExternName '=' 1>           /* Counter of external functions. */
+
+          <Br ListCall '=' >   /* List of function calls. */
+          <Br Listing '=' >    /* Message listing. */
+          <Br CurrentFun '=' > /* Function name.   */
+          <Br Warn '=' 1>      /* Counter of warnings */
+          <Br Err '=' 1>       /* Counter of errors   */
+          <Br Vars '=' >       /* List of defined variables.(program) , */
+                               /* List of parametrs  (mst-scheme)       */
+          <Br Block '=' >      /* Stack of defined variables in the beginings of blocks. */
+          <Br Func '=' 1>      /* Counter of special functions */
+          <Br MstVarId '=' 41> /* Counter of variables from internal mst-schemes. */
+          <Br Mst '=' >        /* List of internal mst-schemes.*/
+          <Br SaveOut '=' >    /* List functions to be output in the Mst-mode. */
+          <Br Level '=' >      /* Level of metacoding. */
+          <Br Key '=' (PutInHistory) (GoAhead)> /* Keys of supercompilation.   */
+          <Br MstEntry '=' No> /* Status of Entry points as Mst-schemes.       */
+          <Br Entry '=' No>    /* Status of function name.                     */
+          <Br Entries '=' >    /* ENTRY names.                                 */
+
+          <Br CurrentSentence '=' <InitSent>>
+          <Br CurrentString   '=' <InitStr>>;
+}
+
+ExtList { =
+* built-in:
+  Add Sub Mul Div Divmod Mod Compare
+  Card Print Prout Open Get Put Putout Sysfun DeSysfun
+  Br Dg Cp Rp Dgall
+  Type Numb Symb Implode Explode Chr Ord Implode_Ext Explode_Ext
+  First Last Lenw Lower Upper
+  Step Time Arg Mu Up Dn Ev-met
+  System Exit GetEnv GetCurrentDirectory
+  ExistFile RemoveFile Close
+  TimeElapsed
+  XMLParse
+
+* reflib.ref:
+  Pair Input Xxout Xxinr Xxin Pprout;
+}
+
+$ENTRY CheckName {
+  s.1 e.F s.2, <Type s.2>: 'L' e.xx = <CheckName s.1 e.F>;
+  s.1 e.F s.2, <Type s.2>: 'D' e.xx = <CheckName s.1 e.F>;
+  s.1 e.F '-' = <CheckName s.1 e.F>;
+  s.1 e.F '_' = <CheckName s.1 e.F>;
+  s.1 , <Type s.1>: 'L' e.xx = ;
+  e.F = <Error 'Inlegal identifier: ' e.F '...' >;
+}
+
+$ENTRY CheckRedef {
+  s.1 e.F, <Type s.1>: 'L' e.xx, <Implode s.1 e.F>: s.M e.zz,
+  <FuncToEncode s.M>: s.N e.yy = <ChRedef s.M s.N> <PutEntry s.N>;
+  e.F = ;
+}
+
+ChRedef {
+ s.M s.N , <Cp ListFun>: e.2 s.N e.list
+           = <Error 'Redefintion of function: ' s.M>;
+ s.M s.N , <Dg Extern>:
+   { e.2 s.N e.extern = <Br Extern '=' e.2 e.extern>
+                   <Warning 'Redefiniton of an external function: ' s.N>;
+     e.extern = <Br Extern '=' e.extern>;
+   };
+}
+
+$ENTRY FuncToUpper {
+ Const__    e.1 = Const__    e.1;
+ UnConst__  e.1 = UnConst__  e.1;
+ Appl__     e.1 = Appl__     e.1;
+ Cut__      e.1 = Cut__      e.1;
+
+ s.N e.1 , <Cp Extern>:
+   { e.2 s.N e.extern = s.N e.1;
+     e.extern = <Implode <Upper <Explode s.N>>> e.1;
+   };
+}
+
+$ENTRY FuncToEncode {
+ Const__    e.1 = Const__    e.1;
+ UnConst__  e.1 = UnConst__  e.1;
+ Appl__     e.1 = Appl__     e.1;
+ Cut__      e.1 = Cut__      e.1;
+
+ s.N e.1 , <Cp Extern>:
+   { e.2 s.N e.extern = s.N e.1;
+     e.extern = <Implode <NameToEncode <Explode s.N>>> e.1;
+   };
+}
+
+$ENTRY NameToEncode {
+ e.name = <NameToEncode1 1 0 (e.name)()()>;
+}
+
+NameToEncode1 {
+ 32 s.digit (e.name) (e.pass) (e.ds)
+            = <NameToEncode1 1 0 (e.name) (e.pass) (s.digit e.ds)>;
+
+ s.power s.digit (e.name s.1) (e.pass)(e.ds), <IsUpper s.1>:
+    { True  = <NameToEncode1 <Mul s.power 2> <Add s.digit s.power>
+                            (e.name) (s.1 e.pass)(e.ds)>;
+      False = <NameToEncode1 <Mul s.power 2> s.digit
+                            (e.name) (s.1 e.pass)(e.ds)>;
+    };
+
+ s.power s.digit () (e.pass)(e.ds) = e.pass '_' <To32 <Add s.digit s.power> e.ds>;
+}
+
+To32 {
+ s.d e.digits, <Sub 9 s.d>:
+     { '-' e.n  = <Chr <Add (<Ord 'a'>) <Sub (e.n) 1> >> <To32 e.digits>;
+           e.n  = <Chr <Add <Ord '0'> s.d>> <To32 e.digits>;
+     };
+  = ;
+}
+
+$ENTRY IsUpper {
+ e.L , <Upper e.L>: e.L = True;
+ e.l = False;
+}
+
+$ENTRY IsFuncName {
+ s.L, <Type s.L>:'L' e.L1 = True;
+ s.L = False;
+}
+
+CheckUndef {
+ = <CheckUndef (ListCall <Cp ListCall>)
+               (ListFun Const__  UnConst__  Appl__  Cut__ <Cp ListFun> <Cp Extern>)>;
+
+ (ListCall e.0 s.F e.calls) (ListFun e.1 s.F e.funcs)
+    = <CheckUndef (ListCall e.0 e.calls) (ListFun e.1 s.F e.funcs)>;
+ (ListCall ) (ListFun e.funcs) = ;
+ (ListCall s.F) (ListFun e.funcs)
+    = <Error> <OutMessage 'Function ' <NameToDecod <Explode s.F>> ' is undefined!'>;
+
+ (ListCall e.calls) (ListFun e.funcs)
+    = <Error> <OutMessage 'Functions ' <NamesToDecod e.calls> 'are undefined!'>;
+}
+
+$ENTRY NameToDecod {
+ e.name = <NameToDecod1 (e.name) e.name>;
+}
+
+NameToDecod1 {
+ (e.F) e.name '_' = e.name;
+ (e.F) e.name s.1 = <NameToDecod1 (e.F) e.name>;
+ (e.F) e.name     = e.F;
+}
+
+NamesToDecod {
+ s.name e.ns = <NameToDecod <Explode s.name>> ' ' <NamesToDecod e.ns>;
+  = ;
+}
+
+
+$ENTRY InternDecl {
+ e.decl
+    = <InternDecl1 (PutInHistory GoAhead)
+                   (ExternList Const__  UnConst__  Appl__  Cut__ <Cp Extern>)() e.decl>;
+}
+
+InternDecl1 {
+ (e.10 s.key e.11) (ExternList e.ext s.n e.0)(e.ns) (s.key s.n e.names) e.1
+   =  <InternDecl1 (e.10 s.key e.11) (ExternList e.ext s.n e.0)(e.ns s.n)
+                   (s.key e.names) e.1>;
+
+ (e.10 s.key e.11) (ExternList e.ext)(e.ns) (s.key s.n e.names) e.1
+   =  <InternDecl1 (e.10 s.key e.11) (ExternList e.ext)
+                   (e.ns <Implode <NameToEncode <Explode s.n>>>)
+                   (s.key e.names) e.1>;
+
+ (e.10 s.key e.11) (ExternList e.ext)(e.ns) (s.key ) e.1
+   = (s.key e.ns) <InternDecl1 (e.10 s.key e.11) (ExternList e.ext)() e.1>;
+
+ (e.10) (ExternList e.ext)() t.key e.1 = t.key <InternDecl1 (e.10) (ExternList e.ext)() e.1>;
+ (e.10) (ExternList e.ext)() = ;
+}
+
