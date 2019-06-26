@@ -39,6 +39,7 @@ DEDecreaseDim1 {
                 <Sub s.C s.X>
                 s.X
             >
+            <Add s.XVal 1>
             (AreEqual ((s.X t.X) e.Vars) (<Sub s.C s.X> Const))
         >;
     s.XVal (AreEqual ((s.X t.X) e.Vars) (s.C Const)) = ;
